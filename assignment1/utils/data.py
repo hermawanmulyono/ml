@@ -31,12 +31,15 @@ def gen_2d_data(x1_max: float, x2_max: float, num_examples: int,
     y_data = np.zeros((num_examples,))
 
     # Conditions for positive labels
-    cond1 = x1 / (x1_max / 2) + x2 / x2_max
+    cond1 = x1 / (x1_max / 2) + x2 / x2_max - 1
     cond2 = np.square(
-        (x1 - x1_max) / (x1_max / 2)) + np.square(x2 / (x2_max / 2))
+        (x1 - x1_max) / (x1_max / 2)) + np.square(x2 / (x2_max / 2)) - 1
+    cond3 = np.max(np.stack(
+        [x1_max / 2 - x1, x2_max * 0.7 - x2, x1 - 0.75 * x1_max], axis=-1),
+                   axis=-1)
 
-    cond = np.minimum(cond1, cond2)
-    prob = 1 / (1 + np.exp((cond - 1) / 0.1))
+    cond = np.minimum(np.minimum(cond1, cond2), cond3)
+    prob = 1 / (1 + np.exp(cond / 0.1))
     rand = np.random.uniform(low=0.1, high=1.0, size=(num_examples,))
     y_data[rand <= prob] = 1
 
@@ -95,8 +98,7 @@ def visualize_2d_data(x_data: np.ndarray, y_data: np.ndarray) -> go.Figure:
     return fig
 
 
-def visualize_2d_decision_boundary(model, x_data: np.ndarray,
-                                   y_data: np.ndarray, x1_max: float,
+def visualize_2d_decision_boundary(model, x1_max: float,
                                    x2_max: float) -> go.Figure:
     """Visualizes the decision boundary of a trained model
 
@@ -106,8 +108,6 @@ def visualize_2d_decision_boundary(model, x_data: np.ndarray,
 
     Args:
         model: A trained model which implements predict_proba() or predict()
-        x_data: x-data to plot on top of the decision function
-        y_data: y-data to plot on top of the decision function
         x1_max: Maximum value of first axis
         x2_max: Maximum value of second axis
 
@@ -137,9 +137,12 @@ def visualize_2d_decision_boundary(model, x_data: np.ndarray,
     z = z.reshape(xx1.shape)
     colorscale = [[0, 'rgba(128,128,255,0.5)'], [1.0, 'rgba(255,128,128,0.5)']]
     fig = go.Figure()
-    fig.add_trace(go.Contour(z=z, x=x1, y=x2, colorscale=colorscale,
-                             contours={'showlines': False}))
-    fig = _add_scatter(fig, x_data, y_data)
+    fig.add_trace(
+        go.Contour(z=z,
+                   x=x1,
+                   y=x2,
+                   colorscale=colorscale,
+                   contours={'showlines': False}))
     fig.update_layout({'xaxis_title': 'x1', 'yaxis_title': 'x2'})
 
     return fig
