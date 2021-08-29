@@ -1,0 +1,6 @@
+# Please install pytorch separately
+# See: https://pytorch.org/get-started/locally/
+# conda install pytorch torchvision torchaudio cudatoolkit=10.2 -c pytorch
+numpy>=1.20
+scikit-learn
+plotly>=5.2.1
