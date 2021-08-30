@@ -1,6 +1,9 @@
 import numpy as np
 import plotly.graph_objects as go
 import sklearn
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
 
 
 def gen_2d_data(x1_max: float, x2_max: float, num_examples: int,
@@ -53,7 +56,8 @@ def gen_2d_data(x1_max: float, x2_max: float, num_examples: int,
     return x_data, y_data
 
 
-def _add_scatter(fig: go.Figure, x_data, y_data):
+def _add_scatter(fig: go.Figure, x_data, y_data, scatter_alpha: float,
+                 scatter_size: int):
     positive_indices = y_data == 1
     x_positive = x_data[positive_indices]
     x_negative = x_data[np.logical_not(positive_indices)]
@@ -64,8 +68,8 @@ def _add_scatter(fig: go.Figure, x_data, y_data):
                    mode='markers',
                    name='positive',
                    marker={
-                       'color': 'rgba(255,0,0,.2)',
-                       'size': 15
+                       'color': f'rgba(255,0,0,{scatter_alpha})',
+                       'size': scatter_size
                    }))
     fig.add_trace(
         go.Scatter(x=x_negative[:, 0],
@@ -73,18 +77,21 @@ def _add_scatter(fig: go.Figure, x_data, y_data):
                    mode='markers',
                    name='negative',
                    marker={
-                       'color': 'rgba(0,0,255,.2)',
-                       'size': 15
+                       'color': f'rgba(0,0,255,{scatter_alpha})',
+                       'size': scatter_size
                    }))
     return fig
 
 
-def visualize_2d_data(x_data: np.ndarray, y_data: np.ndarray) -> go.Figure:
+def visualize_2d_data(x_data: np.ndarray,
+                      y_data: np.ndarray,
+                      title: str = None) -> go.Figure:
     """Visualizes 2D data
 
     Args:
         x_data: A (num_examples, 2) array.
         y_data: A (num_examples, ) array of labels corresponding to `x_data`.
+        title: If given, will add plot title
 
     Returns:
         A plotly figure object
@@ -92,14 +99,18 @@ def visualize_2d_data(x_data: np.ndarray, y_data: np.ndarray) -> go.Figure:
     """
 
     fig = go.Figure()
-    fig = _add_scatter(fig, x_data, y_data)
+    fig = _add_scatter(fig, x_data, y_data, scatter_alpha=0.2, scatter_size=15)
     fig.update_layout({'xaxis_title': 'x1', 'yaxis_title': 'x2'})
+
+    if title is not None:
+        fig.update_layout({'title': title})
 
     return fig
 
 
-def visualize_2d_decision_boundary(model, x1_max: float,
-                                   x2_max: float) -> go.Figure:
+def visualize_2d_decision_boundary(model, x1_max: float, x2_max: float, x_data,
+                                   y_data, title: str = None) -> \
+        go.Figure:
     """Visualizes the decision boundary of a trained model
 
     This function only works with model trained with 2D data.
@@ -107,9 +118,12 @@ def visualize_2d_decision_boundary(model, x1_max: float,
     A meshgrid [0, x1_max] x [0, x2_max] is created.
 
     Args:
+        x_data:
+        y_data:
         model: A trained model which implements predict_proba() or predict()
         x1_max: Maximum value of first axis
         x2_max: Maximum value of second axis
+        title: If given, will add plot title
 
     Returns:
         A plotly figure object
@@ -126,23 +140,31 @@ def visualize_2d_decision_boundary(model, x1_max: float,
 
     x_grid = np.stack([xx1.flatten(), xx2.flatten()], axis=-1)
 
-    if hasattr(model, 'decision_function'):
-        z = model.decision_function(x_grid)  # noqa
-    elif hasattr(model, 'predict_proba'):
+    if type(model) in [DecisionTreeClassifier, AdaBoostClassifier]:
         # Grab the second class
-        z = model.predict_proba(x_grid)[:, 1]  # noqa
+        z = model.predict_proba(x_grid)[:, 1]
+    elif type(model) == SVC:
+        model: SVC
+        z = model.decision_function(x_grid)
+        z = (z > 0).astype(np.float)
     else:
         raise ValueError
 
     z = z.reshape(xx1.shape)
-    colorscale = [[0, 'rgba(128,128,255,0.5)'], [1.0, 'rgba(255,128,128,0.5)']]
+    colorscale = [[0, 'rgba(128,128,200,0.3)'], [1.0, 'rgba(200,128,128,0.3)']]
     fig = go.Figure()
     fig.add_trace(
         go.Contour(z=z,
                    x=x1,
                    y=x2,
                    colorscale=colorscale,
-                   contours={'showlines': False}))
+                   contours={'showlines': False},
+                   colorbar={'len': 0.8, 'nticks': 10}))
+
+    fig = _add_scatter(fig, x_data, y_data, scatter_alpha=0.5, scatter_size=5)
     fig.update_layout({'xaxis_title': 'x1', 'yaxis_title': 'x2'})
+
+    if title:
+        fig.update_layout({'title': title})
 
     return fig
