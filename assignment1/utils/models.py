@@ -1,9 +1,8 @@
-from sklearn.preprocessing import OneHotEncoder
+from typing import Optional
+
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import AdaBoostClassifier
-import torch
-import numpy as np
 
 from utils.nnestimator import NeuralNetworkEstimator
 
@@ -41,8 +40,7 @@ def get_svm(kernel: str, **kernel_params) -> SVC:
 def get_nn(in_features: int, num_classes: int, num_hidden_layers: int,
            hidden_layer_size: int) -> NeuralNetworkEstimator:
 
-    nn_est = NeuralNetworkEstimator(in_features, num_classes,
-                                    num_hidden_layers, hidden_layer_size)
+    nn_est = NeuralNetworkEstimator(in_features, num_classes, num_hidden_layers,
+                                    hidden_layer_size)
 
     return nn_est
-

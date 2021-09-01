@@ -140,15 +140,14 @@ def visualize_2d_decision_boundary(model, x1_max: float, x2_max: float, x_data,
 
     x_grid = np.stack([xx1.flatten(), xx2.flatten()], axis=-1)
 
-    if type(model) in [DecisionTreeClassifier, AdaBoostClassifier]:
-        # Grab the second class
-        z = model.predict_proba(x_grid)[:, 1]
-    elif type(model) == SVC:
+    if type(model) == SVC:
         model: SVC
         z = model.decision_function(x_grid)
         z = (z > 0).astype(np.float)
+
     else:
-        raise ValueError
+        # Grab the second class
+        z = model.predict_proba(x_grid)[:, 1]
 
     z = z.reshape(xx1.shape)
     colorscale = [[0, 'rgba(128,128,200,0.3)'], [1.0, 'rgba(200,128,128,0.3)']]
