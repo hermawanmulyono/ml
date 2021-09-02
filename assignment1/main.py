@@ -5,11 +5,13 @@ import numpy as np
 import torch.random
 
 from utils.data import gen_2d_data, visualize_2d_data, \
-    visualize_2d_decision_boundary
-from utils.models import get_decision_tree, get_boosting, get_svm, get_nn
+    visualize_2d_decision_boundary, get_mnist
+from utils.models import get_decision_tree, get_boosting, get_svm, get_nn, \
+    get_knn
+from utils.nnestimator import training_curves
 
 
-def main():
+def dataset1():
     x1_max = 5
     x2_max = 2
     n_train = 9000
@@ -42,27 +44,60 @@ def main():
     # visualize_2d_decision_boundary(svm_linear, x1_max, x2_max, x_train, y_train,
     #                                'SVM-Linear').show()
 
-    nn = get_nn(in_features=2,
-                num_classes=2,
+    knn = get_knn(50)
+    knn.fit(x_train, y_train)
+
+    fig = visualize_2d_decision_boundary(knn, x1_max, x2_max, x_train, y_train,
+                                         'knn')
+    fig.show()
+
+    # nn = get_nn(in_features=2,
+    #             num_classes=2,
+    #             hidden_layers=[8, 16, 16, 8])
+    #
+    # path_to_state_dict = 'nn.pt'
+    # if os.path.exists(path_to_state_dict):
+    #     nn.load(path_to_state_dict)
+    # else:
+    #     nn.fit(x_train, y_train, x_test, y_test, learning_rate=5e-4,
+    #            batch_size=1024, epochs=1000, verbose=True)
+    #     nn.save(path_to_state_dict)
+    #
+    # loss_fig, acc_fig = training_curves(nn.training_log)
+    # loss_fig.show()
+    # acc_fig.show()
+    #
+    # fig = visualize_2d_decision_boundary(nn, x1_max, x2_max, x_train, y_train,
+    #                                      'Neural network')
+    # fig.show()
+
+
+def dataset2():
+    x_train, y_train = get_mnist(train=True)
+    x_test, y_test = get_mnist(train=False)
+
+    in_features = x_train.shape[1]
+
+    nn = get_nn(in_features=in_features,
+                num_classes=10,
                 hidden_layers=[8, 16, 16, 8])
 
-    path_to_state_dict = 'nn.pt'
+    path_to_state_dict = 'nn_mnist.pt'
     if os.path.exists(path_to_state_dict):
         nn.load(path_to_state_dict)
     else:
-        nn.fit(x_train, y_train, x_test, y_test, learning_rate=5e-3,
-               batch_size=1024, epochs=500, verbose=True)
+        nn.fit(x_train, y_train, x_test, y_test, learning_rate=1e-4,
+               batch_size=128, epochs=100, verbose=True)
         nn.save(path_to_state_dict)
 
-    nn.training_curves.show()
-
-    fig = visualize_2d_decision_boundary(nn, x1_max, x2_max, x_train, y_train,
-                                         'Neural network')
-    fig.show()
+    loss_fig, acc_fig = training_curves(nn.training_log)
+    loss_fig.show()
+    acc_fig.show()
 
 
 if __name__ == '__main__':
     np.random.seed(1234)
     torch.manual_seed(1234)
     logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler()])
-    main()
+    # dataset1()
+    dataset2()

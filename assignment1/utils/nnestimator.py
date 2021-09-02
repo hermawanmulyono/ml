@@ -1,3 +1,4 @@
+import copy
 import logging
 from typing import Tuple, Optional, Dict, List
 
@@ -66,7 +67,7 @@ def focal_loss_fn(y_pred: torch.Tensor,
 
     alphas = alpha * target_one_hot + (1 - alpha) * (1 - target_one_hot)
 
-    losses = - alphas * pt_gamma * torch.log(y_pred)
+    losses = -alphas * pt_gamma * torch.log(y_pred)
 
     losses_sum = torch.sum(losses, dim=1)
     losses_mean = torch.mean(losses_sum, dim=0)
@@ -120,7 +121,7 @@ class NeuralNetworkEstimator:
 
         assert hidden_layers
 
-        hidden_layers_tensors = []
+        hidden_layers_tensors = [torch.nn.BatchNorm1d(num_features=in_features)]
         for i, hidden_layer_size in enumerate(hidden_layers):
             if i == 0:
                 in_features_ = in_features
@@ -144,12 +145,18 @@ class NeuralNetworkEstimator:
         self.num_classes = num_classes
         self.device = torch.device(
             "cuda:0" if not torch.cuda.is_available() else "cpu")
-        self.training_log: Optional[Dict[str, list]] = None
+        self._training_log: Optional[Dict[str, list]] = None
         self.optimizer: Optional[torch.optim.Optimizer] = None
 
-    def fit(self, x_train: np.ndarray, y_train: np.ndarray,
-            x_eval: np.ndarray = None, y_eval: np.ndarray = None,
-            learning_rate=1e-6, batch_size=64, epochs=50, verbose=False):
+    def fit(self,
+            x_train: np.ndarray,
+            y_train: np.ndarray,
+            x_eval: np.ndarray = None,
+            y_eval: np.ndarray = None,
+            learning_rate=1e-6,
+            batch_size=64,
+            epochs=50,
+            verbose=False):
 
         assert len(x_train) == len(y_train)
 
@@ -195,18 +202,27 @@ class NeuralNetworkEstimator:
             bar.finish()
 
     def _update_training_log(self, x_train, y_train, x_eval, y_eval):
-        if self.training_log is None:
-            self.training_log = {'epoch': [], 'train_loss': [], 'eval_loss': []}
+        if self._training_log is None:
+            self._training_log = {
+                'epoch': [],
+                'train_loss': [],
+                'eval_loss': [],
+                'train_accuracy': [],
+                'eval_accuracy': []
+            }
 
-        training_log = self.training_log
-        epoch = len(self.training_log['epoch']) + 1
+        training_log = self._training_log
+        epoch = len(self._training_log['epoch']) + 1
         training_log['epoch'].append(epoch)
 
         device = self.device
 
         self.model.to(self.device)
 
-        def _update(x_data: np.ndarray, y_data: np.ndarray, key: str):
+        def _update(x_data: np.ndarray, y_data: np.ndarray, set_: str):
+
+            assert set_ in {'train', 'eval'}
+
             with torch.no_grad():
                 x_tensor: torch.Tensor = torch.Tensor(x_data).to(device)
                 y_pred = self.model(x_tensor)
@@ -215,14 +231,19 @@ class NeuralNetworkEstimator:
 
                 loss_tensor: torch.Tensor = cross_entropy_fn(y_pred, y_tensor)
                 loss_np = loss_tensor.cpu().numpy()
-                training_log[key].append(float(loss_np))
+                training_log[f'{set_}_loss'].append(float(loss_np))
+
+                labels_pred: torch.Tensor = torch.argmax(y_pred, dim=1)
+                acc = torch.sum(labels_pred == y_tensor) / len(x_data)
+                acc_float = float(acc.cpu().numpy())
+                training_log[f'{set_}_accuracy'].append(acc_float)
 
         # Training set
-        _update(x_train, y_train, 'train_loss')
+        _update(x_train, y_train, 'train')
 
         # Evaluation set
         if x_eval is not None and y_eval is not None:
-            _update(x_eval, y_eval, 'eval_loss')
+            _update(x_eval, y_eval, 'eval')
 
     def predict_proba(self, x_data: np.ndarray) -> np.ndarray:
         with torch.no_grad():
@@ -243,11 +264,11 @@ class NeuralNetworkEstimator:
     def load(self, path_to_state_dict: str):
         state_dict = torch.load(path_to_state_dict)
         self.model.load_state_dict(state_dict['model'])
-        self.training_log = state_dict['training_log']
+        self._training_log = state_dict['training_log']
 
     def save(self, path_to_state_dict: str):
         model_state_dict = self.model.state_dict()
-        training_log_dict = self.training_log
+        training_log_dict = self._training_log
         state_dict = {
             'model': model_state_dict,
             'training_log': training_log_dict
@@ -255,24 +276,59 @@ class NeuralNetworkEstimator:
         torch.save(state_dict, path_to_state_dict)
 
     @property
-    def training_curves(self):
-        """Gives training loss curves"""
+    def training_log(self):
+        """Training log of the neural network"""
+        d = copy.deepcopy(self._training_log)
+
+        return d
+
+
+def training_curves(training_log: Dict[str, list]):
+    """Generates training curves from the training log
+
+    There are two curves:
+      - Loss curves
+      - Accuracy curves
+
+    Args:
+        training_log: A dictionary with the following structure
+
+           `{'epoch': ..., 'train_loss': ..., 'eval_loss': ...,
+           'train_accuracy': ..., 'eval_accuracy': ...}`
+
+    Returns:
+        (loss_fig, acc_fig)
+
+    """
+
+    def _make_plot(train_key: str, eval_key: str, train_legend: str,
+                   eval_legend: str, y_axis_title: str, fig_title: str):
+
         fig = go.Figure()
 
-        training_log_dict = self.training_log
-        x = training_log_dict['epoch']
-        train_loss = training_log_dict['train_loss']
-        eval_loss = training_log_dict['eval_loss']
+        x = training_log['epoch']
+        train_loss = training_log[train_key]
+        eval_loss = training_log[eval_key]
 
         fig.add_trace(
-            go.Scatter(x=x, y=train_loss, mode='lines', name='Train loss'))
+            go.Scatter(x=x, y=train_loss, mode='lines', name=train_legend))
         fig.add_trace(
-            go.Scatter(x=x, y=eval_loss, mode='lines', name='Eval loss'))
+            go.Scatter(x=x, y=eval_loss, mode='lines', name=eval_legend))
 
         fig.update_layout({
             'xaxis_title': 'epoch',
-            'yaxis_title': 'Cross-entropy loss',
-            'title': 'Training Loss'
+            'title_x': 0.5,
+            'yaxis_title': y_axis_title,
+            'title': fig_title
         })
 
         return fig
+
+    loss_fig = _make_plot('train_loss', 'eval_loss', 'Train loss', 'Eval loss',
+                          'Cross-entropy loss',
+                          'Training and Evaluation Loss Curves')
+    acc_fig = _make_plot('train_accuracy', 'eval_accuracy', 'Train accuracy',
+                         'Eval accuracy', 'Accuracy',
+                         'Training and Evaluation Accuracy Curves')
+
+    return loss_fig, acc_fig

@@ -1,5 +1,6 @@
 from typing import Optional, List
 
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import AdaBoostClassifier
@@ -35,6 +36,10 @@ def get_boosting(n_estimators: int, ccp_alpha: float) -> AdaBoostClassifier:
 
 def get_svm(kernel: str, **kernel_params) -> SVC:
     return SVC(kernel=kernel, **kernel_params)
+
+
+def get_knn(k: int) -> KNeighborsClassifier:
+    return KNeighborsClassifier(k)
 
 
 def get_nn(in_features: int, num_classes: int, hidden_layers: List[int]) -> \

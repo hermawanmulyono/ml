@@ -1,9 +1,12 @@
+import os
+
 import numpy as np
 import plotly.graph_objects as go
 import sklearn
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
+import torchvision
 
 
 def gen_2d_data(x1_max: float, x2_max: float, num_examples: int,
@@ -167,3 +170,26 @@ def visualize_2d_decision_boundary(model, x1_max: float, x2_max: float, x_data,
         fig.update_layout({'title': title})
 
     return fig
+
+
+def get_mnist(train: bool):
+    """Gets x_data, y_data of the MNIST dataset
+
+    Args:
+        train: If True, this function gets the training set. Otherwise,
+            it gets the validation set.
+
+    Returns:
+        Tuple (x_data, y_data) where
+            1. `x_data` is an array of shape (num_examples, 784)
+            2. `y_data` is an array of shape (num_examples, )
+
+    """
+    dir_name = 'mnist'
+    os.makedirs(dir_name, exist_ok=True)
+    mnist = torchvision.datasets.MNIST(dir_name, train, download=True)
+    x = np.stack([np.array(x).flatten().copy() for x, _ in mnist])
+    y = np.array([y for _, y in mnist])
+
+    return x, y
+
