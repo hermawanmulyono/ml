@@ -1,9 +1,11 @@
-from typing import Tuple, Optional, Dict
-import os
+import logging
+from typing import Tuple, Optional, Dict, List
 
 import progressbar
 import torch
+import torch.nn.functional as F
 import numpy as np
+import plotly.graph_objects as go
 
 
 def one_hot(y: np.ndarray, num_classes: int):
@@ -48,9 +50,39 @@ def shuffle(x_data: np.ndarray,
     return x_shuffled, y_shuffled
 
 
+def focal_loss_fn(y_pred: torch.Tensor,
+                  y_target: torch.Tensor,
+                  gamma: float = 0.0,
+                  alpha: float = 1.0):
+
+    if y_pred.shape[0] != y_target.shape[0]:
+        raise ValueError(f'Invalid input shapes')
+
+    num_classes = y_pred.shape[1]
+
+    target_one_hot = F.one_hot(y_target, num_classes)
+
+    pt_gamma = torch.pow(1 - y_pred, gamma)
+
+    alphas = alpha * target_one_hot + (1 - alpha) * (1 - target_one_hot)
+
+    losses = - alphas * pt_gamma * torch.log(y_pred)
+
+    losses_sum = torch.sum(losses, dim=1)
+    losses_mean = torch.mean(losses_sum, dim=0)
+
+    return losses_mean
+
+
+def cross_entropy_fn(y_pred: torch.Tensor, y_target: torch.Tensor):
+    log_likelihood = torch.log(y_pred)
+    loss = F.nll_loss(log_likelihood, y_target)
+    return loss
+
+
 def generate_batches(x_data: np.ndarray, y_data: np.ndarray, batch_size: int,
                      trailing: bool):
-    """
+    """Generates data in batches
 
     Args:
         x_data: An array of shape (N, num_features)
@@ -84,56 +116,50 @@ class NeuralNetworkEstimator:
     """
 
     def __init__(self, in_features: int, num_classes: int,
-                 num_hidden_layers: int, hidden_layer_size: int):
+                 hidden_layers: List[int]):
 
-        assert num_hidden_layers >= 1
+        assert hidden_layers
 
-        hidden_layers = []
-        for i in range(num_hidden_layers):
+        hidden_layers_tensors = []
+        for i, hidden_layer_size in enumerate(hidden_layers):
             if i == 0:
                 in_features_ = in_features
             else:
-                in_features_ = num_hidden_layers
+                in_features_ = hidden_layers[i - 1]
 
-            hidden_layers.append(
+            hidden_layers_tensors.append(
                 torch.nn.Linear(in_features_, hidden_layer_size))
-            hidden_layers.append(torch.nn.ReLU())
+            hidden_layers_tensors.append(torch.nn.ReLU())
 
         output_layer = [
-            torch.nn.Linear(hidden_layer_size, num_classes),
+            torch.nn.Linear(hidden_layers[-1], num_classes),
             torch.nn.Softmax(dim=1)
         ]
 
-        layers = hidden_layers + output_layer
+        layers = hidden_layers_tensors + output_layer
 
         model = torch.nn.Sequential(*layers)
 
         self.model = model
         self.num_classes = num_classes
         self.device = torch.device(
-            "cuda:0" if torch.cuda.is_available() else "cpu")
+            "cuda:0" if not torch.cuda.is_available() else "cpu")
         self.training_log: Optional[Dict[str, list]] = None
+        self.optimizer: Optional[torch.optim.Optimizer] = None
 
-    def fit(self,
-            x_train: np.ndarray,
-            y_train: np.ndarray,
-            x_eval: np.ndarray = None,
-            y_eval: np.ndarray = None,
-            learning_rate=1e-6,
-            batch_size=64,
-            epochs=50,
-            verbose=False):
+    def fit(self, x_train: np.ndarray, y_train: np.ndarray,
+            x_eval: np.ndarray = None, y_eval: np.ndarray = None,
+            learning_rate=1e-6, batch_size=64, epochs=50, verbose=False):
 
         assert len(x_train) == len(y_train)
 
-        if verbose:
-            print('Training neural network')
+        logging.info('Training neural network')
 
         device = self.device
         self.model.to(device)
 
-        loss_fn = torch.nn.CrossEntropyLoss()
-        optimizer = torch.optim.SGD(self.model.parameters(), lr=learning_rate)
+        optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+        self.optimizer = optimizer
 
         x_train = x_train.copy()
 
@@ -156,7 +182,8 @@ class NeuralNetworkEstimator:
                 x_tensor = torch.Tensor(x_batch).to(device)
                 y_pred: torch.Tensor = self.model(x_tensor)
                 y_tensor = torch.Tensor(y_batch).type(torch.long).to(device)
-                loss = loss_fn(y_pred, y_tensor)
+
+                loss = cross_entropy_fn(y_pred, y_tensor)
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -169,41 +196,33 @@ class NeuralNetworkEstimator:
 
     def _update_training_log(self, x_train, y_train, x_eval, y_eval):
         if self.training_log is None:
-            self.training_log = {
-                'epoch': [],
-                'train_loss': [],
-                'eval_loss': []
-            }
+            self.training_log = {'epoch': [], 'train_loss': [], 'eval_loss': []}
 
         training_log = self.training_log
         epoch = len(self.training_log['epoch']) + 1
         training_log['epoch'].append(epoch)
 
-        loss_fn = torch.nn.CrossEntropyLoss()
+        device = self.device
 
         self.model.to(self.device)
 
-        with torch.no_grad():
-            # Training set
-            x_tensor: torch.Tensor = torch.Tensor(x_train).to(self.device)
-            y_pred = self.model(x_tensor)
-            y_tensor: torch.Tensor = torch.Tensor(y_train).type(torch.long).to(
-                self.device)
-
-            train_loss: torch.Tensor = loss_fn(y_pred, y_tensor)
-            train_loss_np = train_loss.cpu().numpy()
-            training_log['train_loss'].append(float(train_loss_np))
-
-            # Evaluation set
-            if x_eval is not None and y_eval is not None:
-                x_tensor: torch.Tensor = torch.Tensor(x_eval).to(self.device)
+        def _update(x_data: np.ndarray, y_data: np.ndarray, key: str):
+            with torch.no_grad():
+                x_tensor: torch.Tensor = torch.Tensor(x_data).to(device)
                 y_pred = self.model(x_tensor)
-                y_tensor: torch.Tensor = torch.Tensor(y_eval).type(
-                    torch.long).to(self.device)
+                y_tensor: torch.Tensor = torch.Tensor(y_data).type(
+                    torch.long).to(device)
 
-                eval_loss: torch.Tensor = loss_fn(y_pred, y_tensor)
-                eval_loss_np = eval_loss.cpu().numpy()
-                training_log['eval_loss'].append(float(eval_loss_np))
+                loss_tensor: torch.Tensor = cross_entropy_fn(y_pred, y_tensor)
+                loss_np = loss_tensor.cpu().numpy()
+                training_log[key].append(float(loss_np))
+
+        # Training set
+        _update(x_train, y_train, 'train_loss')
+
+        # Evaluation set
+        if x_eval is not None and y_eval is not None:
+            _update(x_eval, y_eval, 'eval_loss')
 
     def predict_proba(self, x_data: np.ndarray) -> np.ndarray:
         with torch.no_grad():
@@ -235,4 +254,25 @@ class NeuralNetworkEstimator:
         }
         torch.save(state_dict, path_to_state_dict)
 
+    @property
+    def training_curves(self):
+        """Gives training loss curves"""
+        fig = go.Figure()
 
+        training_log_dict = self.training_log
+        x = training_log_dict['epoch']
+        train_loss = training_log_dict['train_loss']
+        eval_loss = training_log_dict['eval_loss']
+
+        fig.add_trace(
+            go.Scatter(x=x, y=train_loss, mode='lines', name='Train loss'))
+        fig.add_trace(
+            go.Scatter(x=x, y=eval_loss, mode='lines', name='Eval loss'))
+
+        fig.update_layout({
+            'xaxis_title': 'epoch',
+            'yaxis_title': 'Cross-entropy loss',
+            'title': 'Training Loss'
+        })
+
+        return fig

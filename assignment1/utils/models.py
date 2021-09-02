@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
@@ -37,10 +37,10 @@ def get_svm(kernel: str, **kernel_params) -> SVC:
     return SVC(kernel=kernel, **kernel_params)
 
 
-def get_nn(in_features: int, num_classes: int, num_hidden_layers: int,
-           hidden_layer_size: int) -> NeuralNetworkEstimator:
+def get_nn(in_features: int, num_classes: int, hidden_layers: List[int]) -> \
+        NeuralNetworkEstimator:
 
-    nn_est = NeuralNetworkEstimator(in_features, num_classes, num_hidden_layers,
-                                    hidden_layer_size)
+    nn_est = NeuralNetworkEstimator(in_features, num_classes,
+                                    hidden_layers)
 
     return nn_est

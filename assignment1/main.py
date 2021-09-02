@@ -1,6 +1,8 @@
+import logging
 import os
 
-import torch
+import numpy as np
+import torch.random
 
 from utils.data import gen_2d_data, visualize_2d_data, \
     visualize_2d_decision_boundary
@@ -42,25 +44,25 @@ def main():
 
     nn = get_nn(in_features=2,
                 num_classes=2,
-                num_hidden_layers=3,
-                hidden_layer_size=3)
+                hidden_layers=[8, 16, 16, 8])
 
     path_to_state_dict = 'nn.pt'
     if os.path.exists(path_to_state_dict):
         nn.load(path_to_state_dict)
     else:
-        nn.fit(x_train,
-               y_train,
-               x_test,
-               y_test,
-               learning_rate=1e-3,
-               epochs=100,
-               verbose=True)
+        nn.fit(x_train, y_train, x_test, y_test, learning_rate=5e-3,
+               batch_size=1024, epochs=500, verbose=True)
         nn.save(path_to_state_dict)
+
+    nn.training_curves.show()
+
     fig = visualize_2d_decision_boundary(nn, x1_max, x2_max, x_train, y_train,
                                          'Neural network')
     fig.show()
 
 
 if __name__ == '__main__':
+    np.random.seed(1234)
+    torch.manual_seed(1234)
+    logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler()])
     main()
