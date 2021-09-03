@@ -8,7 +8,7 @@ from utils.data import gen_2d_data, get_mnist
 from utils.plots import visualize_2d_data, visualize_2d_decision_boundary, \
     training_size_curve
 from utils.models import get_decision_tree, get_boosting, get_svm, get_nn, \
-    get_knn
+    get_knn, grid_search
 from utils.nnestimator import training_curves, NeuralNetworkEstimator
 
 
@@ -27,6 +27,11 @@ def dataset1():
 
     dt = get_decision_tree(ccp_alpha=0.001)
 
+    dt_gs = grid_search(dt, {'ccp_alpha': np.logspace(0, -5)},
+                        x_train, y_train, x_val, y_val)
+
+    best_params = dt_gs.best_params_
+    dt = get_decision_tree(**best_params)
     training_size_curve(dt, x_train, y_train, x_val, y_val,
                         [0.2, 0.4, 0.6, 0.8, 1.0], title='Decision Tree').show()
 

@@ -1,11 +1,16 @@
 from typing import Optional, List, Union
 
+import numpy as np
+from sklearn.model_selection import GridSearchCV
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import AdaBoostClassifier
 
 from utils.nnestimator import NeuralNetworkEstimator
+
+SklearnModel = Union[KNeighborsClassifier, SVC, DecisionTreeClassifier,
+                     AdaBoostClassifier]
 
 
 def get_decision_tree(ccp_alpha: float) -> DecisionTreeClassifier:
@@ -34,8 +39,8 @@ def get_boosting(n_estimators: int, ccp_alpha: float) -> AdaBoostClassifier:
     return adaboost
 
 
-def get_svm(kernel: str, **kernel_params) -> SVC:
-    return SVC(kernel=kernel, **kernel_params)
+def get_svm(kernel: str, **kwargs) -> SVC:
+    return SVC(kernel=kernel, **kwargs)
 
 
 def get_knn(k: int) -> KNeighborsClassifier:
@@ -48,3 +53,36 @@ def get_nn(in_features: int, num_classes: int,
     nn_est = NeuralNetworkEstimator(in_features, num_classes, hidden_layers)
 
     return nn_est
+
+
+def grid_search(model: SklearnModel, param_grid: dict, x_train: np.ndarray,
+                y_train: np.ndarray, x_val: np.ndarray, y_val: np.ndarray):
+
+    if len(x_train) != len(y_train):
+        raise ValueError
+
+    if len(x_val) != len(y_val):
+        raise ValueError
+
+    if x_train.shape[1] != x_val.shape[1]:
+        raise ValueError
+
+    x_concat = np.concatenate([x_train, x_val], axis=0)
+    y_concat = np.concatenate([y_train, y_val], axis=0)
+
+    assert len(x_concat) == len(y_concat)
+
+    n_train = len(x_train)
+    n_concat = len(x_concat)
+
+    cv = [(np.arange(n_train), np.arange(n_train, n_concat))]
+
+    gscv = GridSearchCV(model,
+                        param_grid,
+                        scoring='accuracy',
+                        refit=False,
+                        cv=cv)
+
+    gscv.fit(x_concat, y_concat)
+
+    return gscv
