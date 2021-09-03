@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Union
 
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC

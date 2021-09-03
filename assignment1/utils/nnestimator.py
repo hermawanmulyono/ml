@@ -109,8 +109,8 @@ def generate_batches(x_data: np.ndarray, y_data: np.ndarray, batch_size: int,
         yield x_batch, y_batch
 
 
-def get_sequential_nn(in_features: int, num_classes: int,
-                      hidden_layers: List[int]):
+def sequential_nn(in_features: int, num_classes: int,
+                  hidden_layers: List[int]):
     """Gets a sequential neural network model
 
     The sequential model is defined as
@@ -179,7 +179,7 @@ class NeuralNetworkEstimator:
 
         assert hidden_layers
 
-        model = get_sequential_nn(in_features, num_classes, hidden_layers)
+        model = sequential_nn(in_features, num_classes, hidden_layers)
 
         self._model = model
         self._num_classes = num_classes
@@ -196,8 +196,8 @@ class NeuralNetworkEstimator:
     def fit(self,
             x_train: np.ndarray,
             y_train: np.ndarray,
-            x_eval: np.ndarray = None,
-            y_eval: np.ndarray = None,
+            x_val: np.ndarray = None,
+            y_val: np.ndarray = None,
             learning_rate=1e-6,
             batch_size=64,
             epochs=50,
@@ -244,19 +244,19 @@ class NeuralNetworkEstimator:
                 loss.backward()
                 optimizer.step()
 
-            self._update_training_log(x_train, y_train, x_eval, y_eval)
+            self._update_training_log(x_train, y_train, x_val, y_val)
 
         if verbose:
             bar.finish()
 
-    def _update_training_log(self, x_train, y_train, x_eval, y_eval):
+    def _update_training_log(self, x_train, y_train, x_val, y_val):
         if self._training_log is None:
             self._training_log = {
                 'epoch': [],
                 'train_loss': [],
-                'eval_loss': [],
+                'val_loss': [],
                 'train_accuracy': [],
-                'eval_accuracy': []
+                'val_accuracy': []
             }
 
         training_log = self._training_log
@@ -269,7 +269,7 @@ class NeuralNetworkEstimator:
 
         def _update(x_data: np.ndarray, y_data: np.ndarray, set_: str):
 
-            assert set_ in {'train', 'eval'}
+            assert set_ in {'train', 'val'}
 
             with torch.no_grad():
                 x_tensor: torch.Tensor = torch.Tensor(x_data).to(device)
@@ -289,9 +289,9 @@ class NeuralNetworkEstimator:
         # Training set
         _update(x_train, y_train, 'train')
 
-        # Evaluation set
-        if x_eval is not None and y_eval is not None:
-            _update(x_eval, y_eval, 'eval')
+        # Validation set
+        if x_val is not None and y_val is not None:
+            _update(x_val, y_val, 'val')
 
     def predict_proba(self, x_data: np.ndarray) -> np.ndarray:
         """Predicts the label probabilities from `x_data`
@@ -388,27 +388,27 @@ def training_curves(training_log: Dict[str, list]):
     Args:
         training_log: A dictionary with the following structure
 
-           `{'epoch': ..., 'train_loss': ..., 'eval_loss': ...,
-           'train_accuracy': ..., 'eval_accuracy': ...}`
+           `{'epoch': ..., 'train_loss': ..., 'val_loss': ...,
+           'train_accuracy': ..., 'val_accuracy': ...}`
 
     Returns:
         (loss_fig, acc_fig)
 
     """
 
-    def _make_plot(train_key: str, eval_key: str, train_legend: str,
-                   eval_legend: str, y_axis_title: str, fig_title: str):
+    def _make_plot(train_key: str, val_key: str, train_legend: str,
+                   val_legend: str, y_axis_title: str, fig_title: str):
 
         fig = go.Figure()
 
         x = training_log['epoch']
         train_loss = training_log[train_key]
-        eval_loss = training_log[eval_key]
+        val_loss = training_log[val_key]
 
         fig.add_trace(
             go.Scatter(x=x, y=train_loss, mode='lines', name=train_legend))
         fig.add_trace(
-            go.Scatter(x=x, y=eval_loss, mode='lines', name=eval_legend))
+            go.Scatter(x=x, y=val_loss, mode='lines', name=val_legend))
 
         fig.update_layout({
             'xaxis_title': 'epoch',
@@ -419,11 +419,11 @@ def training_curves(training_log: Dict[str, list]):
 
         return fig
 
-    loss_fig = _make_plot('train_loss', 'eval_loss', 'Train loss', 'Eval loss',
+    loss_fig = _make_plot('train_loss', 'val_loss', 'Train loss', 'Val loss',
                           'Cross-entropy loss',
-                          'Training and Evaluation Loss Curves')
-    acc_fig = _make_plot('train_accuracy', 'eval_accuracy', 'Train accuracy',
-                         'Eval accuracy', 'Accuracy',
-                         'Training and Evaluation Accuracy Curves')
+                          'Training and Validation Loss Curves')
+    acc_fig = _make_plot('train_accuracy', 'val_accuracy', 'Train accuracy',
+                         'Val accuracy', 'Accuracy',
+                         'Training and Validation Accuracy Curves')
 
     return loss_fig, acc_fig

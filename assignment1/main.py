@@ -4,8 +4,9 @@ import os
 import numpy as np
 import torch.random
 
-from utils.data import gen_2d_data, visualize_2d_data, \
-    visualize_2d_decision_boundary, get_mnist
+from utils.data import gen_2d_data, get_mnist
+from utils.plots import visualize_2d_data, visualize_2d_decision_boundary, \
+    training_size_curve
 from utils.models import get_decision_tree, get_boosting, get_svm, get_nn, \
     get_knn
 from utils.nnestimator import training_curves, NeuralNetworkEstimator
@@ -24,7 +25,11 @@ def dataset1():
 
     # visualize_2d_data(x_train, y_train, '2D Data').show()
 
-    # dt = get_decision_tree(ccp_alpha=0.001)
+    dt = get_decision_tree(ccp_alpha=0.001)
+
+    training_size_curve(dt, x_train, y_train, x_val, y_val,
+                        [0.2, 0.4, 0.6, 0.8, 1.0], title='Decision Tree').show()
+
     # dt.fit(x_train, y_train)
 
     # visualize_2d_decision_boundary(dt, x1_max, x2_max, x_train, y_train,
@@ -46,12 +51,12 @@ def dataset1():
     # visualize_2d_decision_boundary(svm_linear, x1_max, x2_max, x_train, y_train,
     #                                'SVM-Linear').show()
 
-    knn = get_knn(50)
-    knn.fit(x_train, y_train)
-
-    fig = visualize_2d_decision_boundary(knn, x1_max, x2_max, x_train, y_train,
-                                         'knn')
-    fig.show()
+    # knn = get_knn(50)
+    # knn.fit(x_train, y_train)
+    #
+    # fig = visualize_2d_decision_boundary(knn, x1_max, x2_max, x_train, y_train,
+    #                                      'knn')
+    # fig.show()
 
     # nn = get_nn(in_features=2,
     #             num_classes=2,
@@ -87,8 +92,8 @@ def dataset2():
         nn = get_nn(in_features=in_features,
                     num_classes=10,
                     hidden_layers=[8, 16, 16, 8])
-        nn.fit(x_train, y_train, x_test, y_test, learning_rate=1e-4,
-               batch_size=128, epochs=100, verbose=True)
+        nn.fit(x_train, y_train, x_test, y_test, learning_rate=1e-5,
+               batch_size=128, epochs=1000, verbose=True)
         nn.save(path_to_state_dict)
 
     loss_fig, acc_fig = training_curves(nn.training_log)
@@ -100,5 +105,5 @@ if __name__ == '__main__':
     np.random.seed(1234)
     torch.manual_seed(1234)
     logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler()])
-    # dataset1()
-    dataset2()
+    dataset1()
+    # dataset2()
