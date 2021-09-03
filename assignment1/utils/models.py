@@ -12,7 +12,7 @@ def get_decision_tree(ccp_alpha: float) -> DecisionTreeClassifier:
     """Constructs a decision tree with pruning
 
     Args:
-        ccp_alpha: Pruning minimal cost-complexity paramether alpha
+        ccp_alpha: Pruning minimal cost-complexity parameter alpha
 
     Returns:
         A decision tree classifier object
@@ -42,10 +42,9 @@ def get_knn(k: int) -> KNeighborsClassifier:
     return KNeighborsClassifier(k)
 
 
-def get_nn(in_features: int, num_classes: int, hidden_layers: List[int]) -> \
-        NeuralNetworkEstimator:
+def get_nn(in_features: int, num_classes: int,
+           hidden_layers: List[int]) -> NeuralNetworkEstimator:
 
-    nn_est = NeuralNetworkEstimator(in_features, num_classes,
-                                    hidden_layers)
+    nn_est = NeuralNetworkEstimator(in_features, num_classes, hidden_layers)
 
     return nn_est

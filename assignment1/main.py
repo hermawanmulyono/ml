@@ -8,16 +8,18 @@ from utils.data import gen_2d_data, visualize_2d_data, \
     visualize_2d_decision_boundary, get_mnist
 from utils.models import get_decision_tree, get_boosting, get_svm, get_nn, \
     get_knn
-from utils.nnestimator import training_curves
+from utils.nnestimator import training_curves, NeuralNetworkEstimator
 
 
 def dataset1():
     x1_max = 5
     x2_max = 2
     n_train = 9000
+    n_val = 1000
     n_test = 1000
     noise_prob = 0.005
     x_train, y_train = gen_2d_data(x1_max, x2_max, n_train, noise_prob)
+    x_val, y_val = gen_2d_data(x1_max, x2_max, n_val, noise_prob)
     x_test, y_test = gen_2d_data(x1_max, x2_max, n_test, noise_prob)
 
     # visualize_2d_data(x_train, y_train, '2D Data').show()
@@ -78,14 +80,13 @@ def dataset2():
 
     in_features = x_train.shape[1]
 
-    nn = get_nn(in_features=in_features,
-                num_classes=10,
-                hidden_layers=[8, 16, 16, 8])
-
     path_to_state_dict = 'nn_mnist.pt'
     if os.path.exists(path_to_state_dict):
-        nn.load(path_to_state_dict)
+        nn = NeuralNetworkEstimator.from_state_dict(path_to_state_dict)
     else:
+        nn = get_nn(in_features=in_features,
+                    num_classes=10,
+                    hidden_layers=[8, 16, 16, 8])
         nn.fit(x_train, y_train, x_test, y_test, learning_rate=1e-4,
                batch_size=128, epochs=100, verbose=True)
         nn.save(path_to_state_dict)
