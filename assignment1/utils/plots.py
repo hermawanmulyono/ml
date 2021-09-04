@@ -1,10 +1,11 @@
 import copy
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, Dict, Any
 
 import numpy as np
 from plotly import graph_objects as go
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.metrics import accuracy_score
+from sklearn.model_selection import validation_curve, learning_curve
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
@@ -137,8 +138,8 @@ def _add_scatter(fig: go.Figure, x_data, y_data, scatter_alpha: float,
 
 def training_size_curve(model: ModelType, x_train: np.ndarray,
                         y_train: np.ndarray, x_val: np.ndarray,
-                        y_val: np.ndarray, sizes: List[float],
-                        title: str) -> go.Figure:
+                        y_val: np.ndarray, sizes: List[float], title: str,
+                        n_jobs) -> go.Figure:
     """Produces a training curve with respect to training size
 
     Args:
@@ -150,6 +151,7 @@ def training_size_curve(model: ModelType, x_train: np.ndarray,
         sizes: List of training sizes as fractions e.g.
             `[0.1, 0.25, 0.5, 0.75, 1.0]`.
         title: Plot title
+        n_jobs: Number of jobs
 
     Returns:
 
@@ -161,32 +163,56 @@ def training_size_curve(model: ModelType, x_train: np.ndarray,
     if len(x_val) != len(y_val):
         raise ValueError
 
+    if x_train.shape[1] != x_val.shape[1]:
+        raise ValueError
+
     if not all([0 <= s <= 1.0 for s in sizes]):
         raise ValueError
 
-    x_shuffle, y_shuffle = shuffle(x_train, y_train)
+    x_concat = np.concatenate([x_train, x_val], axis=0)
+    y_concat = np.concatenate([y_train, y_val], axis=0)
 
-    def train_and_eval(size_: float) -> Tuple[float, float]:
-        # Copy so that the original model is intact
-        model_copy = copy.deepcopy(model)
+    assert len(x_concat) == len(y_concat)
 
-        n_train = int(size_ * len(x_train))
+    n_train = len(x_train)
+    n_concat = len(x_concat)
 
-        x_train_ = x_shuffle[:n_train]
-        y_train_ = y_shuffle[:n_train]
+    cv = [(np.arange(n_train), np.arange(n_train, n_concat))]
 
-        model_copy.fit(x_train_, y_train_)
+    # def train_and_eval(size_: float) -> Tuple[float, float]:
+    #     # Copy so that the original model is intact
+    #     model_copy = copy.deepcopy(model)
+    #
+    #     n_train = int(size_ * len(x_train))
+    #
+    #     x_train_ = x_shuffle[:n_train]
+    #     y_train_ = y_shuffle[:n_train]
+    #
+    #     model_copy.fit(x_train_, y_train_)
+    #
+    #     y_pred_train_ = model_copy.predict(x_train_)
+    #     train_acc_ = accuracy_score(y_train_, y_pred_train_)
+    #
+    #     y_pred_val_ = model_copy.predict(x_val)
+    #     val_acc_ = accuracy_score(y_val, y_pred_val_)
+    #
+    #     return train_acc_, val_acc_
 
-        y_pred_train_ = model_copy.predict(x_train_)
-        train_acc_ = accuracy_score(y_train_, y_pred_train_)
+    train_sizes_ags, train_accs_, val_accs_ = learning_curve(
+        model,
+        x_concat,
+        y_concat,
+        train_sizes=sizes,
+        cv=cv,
+        # scoring='accuracy',
+        n_jobs=n_jobs,
+        shuffle=True)
 
-        y_pred_val_ = model_copy.predict(x_val)
-        val_acc_ = accuracy_score(y_val, y_pred_val_)
+    # train_val_accs = map(train_and_eval, sizes)
+    # train_accs, val_accs = zip(*train_val_accs)
 
-        return train_acc_, val_acc_
-
-    train_val_accs = map(train_and_eval, sizes)
-    train_accs, val_accs = zip(*train_val_accs)
+    train_accs = train_accs_.flatten()
+    val_accs = val_accs_.flatten()
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=sizes, y=train_accs, mode='lines', name='train'))
@@ -198,4 +224,95 @@ def training_size_curve(model: ModelType, x_train: np.ndarray,
 
     fig.update_layout({'title': title})
 
+    return fig
+
+
+def complexity_curve(model: ModelType,
+                     x_train: np.ndarray,
+                     y_train: np.ndarray,
+                     x_val: np.ndarray,
+                     y_val: np.ndarray,
+                     param_name: str,
+                     param_range: Any,
+                     title: str,
+                     log_scale,
+                     n_jobs: int = 1) -> go.Figure:
+    """Plots a complexity curve of a model
+
+    Args:
+        log_scale:
+        model: An untrained model
+        x_train: Training set features (n_train, n_features)
+        y_train: Training set labels (n_train, )
+        x_val: Validation set features (n_train, n_features)
+        y_val: Validation set labels (n_train, )
+        param_name: Parameter name to sweep
+        param_range: Values of the `param_name`
+        title: Plot title
+        n_jobs: Number of jobs
+
+    Returns:
+
+    """
+
+    # def train_and_eval(params_: Dict[str, Any]) -> Tuple[float, float]:
+    #     # Copy so that the original model is intact
+    #     model_copy = copy.deepcopy(model)
+    #
+    #     model_copy.fit(x_train, y_train)
+    #
+    #     y_pred_train_ = model_copy.predict(x_train)
+    #     train_acc_ = accuracy_score(y_train, y_pred_train_)
+    #
+    #     y_pred_val_ = model_copy.predict(x_val)
+    #     val_acc_ = accuracy_score(y_val, y_pred_val_)
+    #
+    #     return train_acc_, val_acc_
+    #
+    # keywords = set(params.keys())
+    # if not keywords:
+    #     raise ValueError
+
+    if len(x_train) != len(y_train):
+        raise ValueError
+
+    if len(x_val) != len(y_val):
+        raise ValueError
+
+    if x_train.shape[1] != x_val.shape[1]:
+        raise ValueError
+
+    x_concat = np.concatenate([x_train, x_val], axis=0)
+    y_concat = np.concatenate([y_train, y_val], axis=0)
+
+    assert len(x_concat) == len(y_concat)
+
+    n_train = len(x_train)
+    n_concat = len(x_concat)
+
+    cv = [(np.arange(n_train), np.arange(n_train, n_concat))]
+
+    train_scores_, val_scores_ = validation_curve(model,
+                                                  x_concat,
+                                                  y_concat,
+                                                  param_name=param_name,
+                                                  param_range=param_range,
+                                                  cv=cv,
+                                                  scoring='accuracy',
+                                                  n_jobs=n_jobs)
+
+    train_scores = train_scores_.flatten()
+    val_scores = val_scores_.flatten()
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(x=param_range, y=train_scores, mode='lines', name='train'))
+    fig.add_trace(
+        go.Scatter(x=param_range, y=val_scores, mode='lines', name='val'))
+    fig.update_layout({'xaxis_title': param_name, 'yaxis_title': 'Accuracy'})
+
+    if log_scale:
+        fig.update_xaxes(type='log')
+
+    fig.update_layout({'title': title})
     return fig

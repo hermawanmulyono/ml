@@ -1,18 +1,18 @@
 import logging
+import multiprocessing
 import os
 
 import numpy as np
 import torch.random
+from sklearn.model_selection import train_test_split
 
 from utils.data import gen_2d_data, get_mnist
-from utils.plots import visualize_2d_data, visualize_2d_decision_boundary, \
-    training_size_curve
-from utils.models import get_decision_tree, get_boosting, get_svm, get_nn, \
-    get_knn, grid_search
+from utils.models import get_nn
 from utils.nnestimator import training_curves, NeuralNetworkEstimator
+from utils.tasks import dt_task
 
 
-def dataset1():
+def dataset1(n_jobs):
     x1_max = 5
     x2_max = 2
     n_train = 9000
@@ -23,17 +23,11 @@ def dataset1():
     x_val, y_val = gen_2d_data(x1_max, x2_max, n_val, noise_prob)
     x_test, y_test = gen_2d_data(x1_max, x2_max, n_test, noise_prob)
 
+    train_sizes = [0.2, 0.4, 0.6, 0.8, 1.0]
+
     # visualize_2d_data(x_train, y_train, '2D Data').show()
 
-    dt = get_decision_tree(ccp_alpha=0.001)
-
-    dt_gs = grid_search(dt, {'ccp_alpha': np.logspace(0, -5)},
-                        x_train, y_train, x_val, y_val)
-
-    best_params = dt_gs.best_params_
-    dt = get_decision_tree(**best_params)
-    training_size_curve(dt, x_train, y_train, x_val, y_val,
-                        [0.2, 0.4, 0.6, 0.8, 1.0], title='Decision Tree').show()
+    dt_task(x_train, y_train, x_val, y_val, train_sizes, 'Dataset2D', n_jobs)
 
     # dt.fit(x_train, y_train)
 
@@ -84,9 +78,21 @@ def dataset1():
     # fig.show()
 
 
-def dataset2():
-    x_train, y_train = get_mnist(train=True)
+def dataset2(n_jobs=1):
+    mnist_x_train, mnist_y_train = get_mnist(train=True)
     x_test, y_test = get_mnist(train=False)
+
+    x_train, x_val, y_train, y_val = train_test_split(mnist_x_train,
+                                                      mnist_y_train,
+                                                      test_size=0.2)
+
+    assert len(x_train) == len(y_train)
+    assert len(x_val) == len(y_val)
+    assert x_train.shape[1] == x_val.shape[1] == x_test.shape[1]
+
+    train_sizes = [0.2, 0.4, 0.6, 0.8, 1.0]
+
+    dt_task(x_train, y_train, x_val, y_val, train_sizes, 'MNIST', n_jobs)
 
     in_features = x_train.shape[1]
 
@@ -97,8 +103,14 @@ def dataset2():
         nn = get_nn(in_features=in_features,
                     num_classes=10,
                     hidden_layers=[8, 16, 16, 8])
-        nn.fit(x_train, y_train, x_test, y_test, learning_rate=1e-5,
-               batch_size=128, epochs=1000, verbose=True)
+        nn.fit(x_train,
+               y_train,
+               x_test,
+               y_test,
+               learning_rate=1e-5,
+               batch_size=128,
+               epochs=1000,
+               verbose=True)
         nn.save(path_to_state_dict)
 
     loss_fig, acc_fig = training_curves(nn.training_log)
@@ -109,6 +121,7 @@ def dataset2():
 if __name__ == '__main__':
     np.random.seed(1234)
     torch.manual_seed(1234)
+    num_jobs = multiprocessing.cpu_count()
     logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler()])
-    dataset1()
-    # dataset2()
+    # dataset1(num_jobs)
+    dataset2(num_jobs)

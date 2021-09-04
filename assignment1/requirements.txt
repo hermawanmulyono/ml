@@ -5,3 +5,4 @@ numpy>=1.20
 scikit-learn
 plotly>=5.2.1
 progressbar2
+scikit-image

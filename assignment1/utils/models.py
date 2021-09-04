@@ -24,7 +24,7 @@ def get_decision_tree(ccp_alpha: float) -> DecisionTreeClassifier:
 
     """
     dt = DecisionTreeClassifier(criterion='entropy',
-                                splitter='best',
+                                splitter='random',
                                 ccp_alpha=ccp_alpha)
     return dt
 
@@ -56,7 +56,8 @@ def get_nn(in_features: int, num_classes: int,
 
 
 def grid_search(model: SklearnModel, param_grid: dict, x_train: np.ndarray,
-                y_train: np.ndarray, x_val: np.ndarray, y_val: np.ndarray):
+                y_train: np.ndarray, x_val: np.ndarray, y_val: np.ndarray,
+                n_jobs):
 
     if len(x_train) != len(y_train):
         raise ValueError
@@ -79,9 +80,10 @@ def grid_search(model: SklearnModel, param_grid: dict, x_train: np.ndarray,
 
     gscv = GridSearchCV(model,
                         param_grid,
-                        scoring='accuracy',
+                        # scoring='accuracy',
                         refit=False,
-                        cv=cv)
+                        cv=cv,
+                        n_jobs=n_jobs)
 
     gscv.fit(x_concat, y_concat)
 

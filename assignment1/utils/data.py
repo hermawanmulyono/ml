@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 import torchvision
+from torchvision.transforms import Resize
 
 
 def gen_2d_data(x1_max: float, x2_max: float, num_examples: int,
@@ -55,7 +56,7 @@ def gen_2d_data(x1_max: float, x2_max: float, num_examples: int,
 
 
 def get_mnist(train: bool):
-    """Gets x_data, y_data of the MNIST dataset
+    """Gets x_data, y_data of the MNIST dataset, resampled 5%
 
     Args:
         train: If True, this function gets the training set. Otherwise,
@@ -73,5 +74,13 @@ def get_mnist(train: bool):
     x = np.stack([np.array(x).flatten().copy() for x, _ in mnist])
     y = np.array([y for _, y in mnist])
 
-    return x, y
+    assert len(x) == len(y)
+    num_examples = len(x)
+
+    # Resample 5% only
+    indices = np.arange(0, num_examples, 1)
+    x_resampled = x[indices]
+    y_resampled = y[indices]
+
+    return x_resampled, y_resampled
 
