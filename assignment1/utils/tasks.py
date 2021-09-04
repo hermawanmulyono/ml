@@ -3,7 +3,7 @@ from typing import List, Callable, Dict, Any, Iterable
 
 import numpy as np
 
-from utils.models import get_decision_tree, grid_search
+from utils.models import get_decision_tree, grid_search, get_knn
 from utils.plots import training_size_curve, complexity_curve, ModelType
 
 
@@ -39,42 +39,26 @@ def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     dataset_name = dataset_name
     model_name = 'DT'
 
-    _task_template(constructor_fn, default_params,
-                   param_grid, x_train, y_train, x_val, y_val, train_sizes,
-                   param_name, param_range, dataset_name, model_name, n_jobs)
-    #
-    # dt = get_decision_tree(ccp_alpha=0.001)
-    #
-    # logging.info(f'{dataset_name} - DT - Grid search')
-    # dt_gs = grid_search(dt, {'ccp_alpha': ccp_alphas}, x_train, y_train, x_val,
-    #                     y_val, n_jobs)
-    #
-    # best_params = dt_gs.best_params_
-    # dt = get_decision_tree(**best_params)
-    #
-    # logging.info(f'{dataset_name} - DT - Training size curve')
-    # fig = training_size_curve(dt,
-    #                           x_train,
-    #                           y_train,
-    #                           x_val,
-    #                           y_val,
-    #                           train_sizes,
-    #                           title=f'{dataset_name} - DT Training Size Curve',
-    #                           n_jobs=n_jobs)
-    # fig.show()
-    #
-    # logging.info(f'{dataset_name} - DT - Complexity curve')
-    # fig = complexity_curve(dt,
-    #                        x_train,
-    #                        y_train,
-    #                        x_val,
-    #                        y_val,
-    #                        param_name='ccp_alpha',
-    #                        param_range=ccp_alphas,
-    #                        title=f'{dataset_name} - DT Complexity Curve',
-    #                        log_scale=True,
-    #                        n_jobs=n_jobs)
-    # fig.show()
+    _task_template(constructor_fn, default_params, param_grid, x_train, y_train,
+                   x_val, y_val, train_sizes, param_name, param_range,
+                   dataset_name, model_name, n_jobs)
+
+
+def knn_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
+             y_val: np.ndarray, train_sizes: List[float], dataset_name: str,
+             n_jobs):
+    constructor_fn = get_knn
+    default_params = {'n_neighbors': 9}
+    k_values = [2**p + 1 for p in range(10)]
+    param_grid = {'n_neighbors': k_values}
+    param_name = 'n_neighbors'
+    param_range = k_values
+    dataset_name = dataset_name
+    model_name = 'KNN'
+
+    _task_template(constructor_fn, default_params, param_grid, x_train, y_train,
+                   x_val, y_val, train_sizes, param_name, param_range,
+                   dataset_name, model_name, n_jobs)
 
 
 def _task_template(constructor_fn: Callable[..., ModelType],
@@ -106,27 +90,29 @@ def _task_template(constructor_fn: Callable[..., ModelType],
         None.
 
     """
-    dt = constructor_fn(**default_params)
+    model = constructor_fn(**default_params)
     logging.info(f'{dataset_name} - {model_name} - Grid search')
-    dt_gs = grid_search(dt, param_grid, x_train, y_train, x_val, y_val, n_jobs)
+    dt_gs = grid_search(model, param_grid, x_train, y_train, x_val, y_val,
+                        n_jobs)
 
     best_params = dt_gs.best_params_
-    dt = get_decision_tree(**best_params)
+    model = constructor_fn(**best_params)
 
     logging.info(f'{dataset_name} - {model_name} - Training size curve')
-    fig = training_size_curve(dt,
-                              x_train,
-                              y_train,
-                              x_val,
-                              y_val,
-                              train_sizes,
-                              title=f'{dataset_name} - DT Training Size Curve',
-                              n_jobs=n_jobs)
+    fig = training_size_curve(
+        model,
+        x_train,
+        y_train,
+        x_val,
+        y_val,
+        train_sizes,
+        title=f'{dataset_name} - {model_name} Training Size Curve',
+        n_jobs=n_jobs)
     fig.show()
 
     logging.info(f'{dataset_name} - {model_name} - Complexity curve')
     fig = complexity_curve(
-        dt,
+        model,
         x_train,
         y_train,
         x_val,

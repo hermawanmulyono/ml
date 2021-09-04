@@ -43,8 +43,8 @@ def get_svm(kernel: str, **kwargs) -> SVC:
     return SVC(kernel=kernel, **kwargs)
 
 
-def get_knn(k: int) -> KNeighborsClassifier:
-    return KNeighborsClassifier(k)
+def get_knn(n_neighbors: int) -> KNeighborsClassifier:
+    return KNeighborsClassifier(n_neighbors)
 
 
 def get_nn(in_features: int, num_classes: int,

@@ -9,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from utils.data import gen_2d_data, get_mnist
 from utils.models import get_nn
 from utils.nnestimator import training_curves, NeuralNetworkEstimator
-from utils.tasks import dt_task
+from utils.tasks import dt_task, knn_task
 
 
 def dataset1(n_jobs):
@@ -78,7 +78,7 @@ def dataset1(n_jobs):
     # fig.show()
 
 
-def dataset2(n_jobs=1):
+def dataset2(n_jobs):
     mnist_x_train, mnist_y_train = get_mnist(train=True)
     x_test, y_test = get_mnist(train=False)
 
@@ -92,7 +92,8 @@ def dataset2(n_jobs=1):
 
     train_sizes = [0.2, 0.4, 0.6, 0.8, 1.0]
 
-    dt_task(x_train, y_train, x_val, y_val, train_sizes, 'MNIST', n_jobs)
+    # dt_task(x_train, y_train, x_val, y_val, train_sizes, 'MNIST', n_jobs)
+    knn_task(x_train, y_train, x_val, y_val, train_sizes, 'MNIST', n_jobs)
 
     in_features = x_train.shape[1]
 

@@ -78,7 +78,7 @@ def get_mnist(train: bool):
     num_examples = len(x)
 
     # Resample 5% only
-    indices = np.arange(0, num_examples, 1)
+    indices = np.arange(0, num_examples, 5)
     x_resampled = x[indices]
     y_resampled = y[indices]
 
