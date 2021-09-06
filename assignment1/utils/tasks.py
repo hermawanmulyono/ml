@@ -1,15 +1,19 @@
+import copy
 import logging
+import os
 from typing import List, Callable, Dict, Any, Iterable
 
 import numpy as np
 
-from utils.models import get_decision_tree, grid_search, get_knn
+from utils.models import get_decision_tree, grid_search, get_knn, get_svm, \
+    get_boosting, get_nn, grid_search_nn
+from utils.nnestimator import NeuralNetworkEstimator, training_curves
 from utils.plots import training_size_curve, complexity_curve, ModelType
 
 
 def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
             y_val: np.ndarray, train_sizes: List[float], dataset_name: str,
-            n_jobs):
+            n_jobs: int):
     """Task for decision tree
 
     The tasks are:
@@ -46,10 +50,10 @@ def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
 def knn_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
              y_val: np.ndarray, train_sizes: List[float], dataset_name: str,
-             n_jobs):
+             n_jobs: int):
     constructor_fn = get_knn
     default_params = {'n_neighbors': 9}
-    k_values = [2**p + 1 for p in range(10)]
+    k_values = [2**p + 1 for p in range(6)]
     param_grid = {'n_neighbors': k_values}
     param_name = 'n_neighbors'
     param_range = k_values
@@ -59,6 +63,88 @@ def knn_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     _task_template(constructor_fn, default_params, param_grid, x_train, y_train,
                    x_val, y_val, train_sizes, param_name, param_range,
                    dataset_name, model_name, n_jobs)
+
+
+def svm_poly_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
+                  y_val: np.ndarray, train_sizes: List[float],
+                  dataset_name: str, n_jobs: int):
+    constructor_fn = get_svm
+    default_params = {'kernel': 'poly'}
+    degree_values = [1, 2, 3, 4, 5]
+    param_grid = {'C': [0.1, 1.0, 10.0], 'degree': [1, 2, 3, 4, 5]}
+    param_name = 'degree'
+    param_range = degree_values
+    dataset_name = dataset_name
+    model_name = 'SVM - Polynomial'
+
+    _task_template(constructor_fn, default_params, param_grid, x_train, y_train,
+                   x_val, y_val, train_sizes, param_name, param_range,
+                   dataset_name, model_name, n_jobs)
+
+
+def svm_rbf_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
+                 y_val: np.ndarray, train_sizes: List[float], dataset_name: str,
+                 n_jobs: int):
+    constructor_fn = get_svm
+    default_params = {'kernel': 'rbf'}
+    gamma_values = np.arange(2, -3, 5)
+    param_grid = {'C': [0.1, 1.0, 10.0], 'gamma': gamma_values}
+    param_name = 'gamma'
+    param_range = gamma_values
+    dataset_name = dataset_name
+    model_name = 'SVM - RBF'
+
+    _task_template(constructor_fn, default_params, param_grid, x_train, y_train,
+                   x_val, y_val, train_sizes, param_name, param_range,
+                   dataset_name, model_name, n_jobs)
+
+
+def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
+                  y_val: np.ndarray, train_sizes: List[float],
+                  dataset_name: str, n_jobs: int):
+    constructor_fn = get_boosting
+    default_params = {'n_estimators': 512, 'ccp_alpha': 0.001}
+    param_grid = {'n_estimators': [512]}
+    param_name = 'n_estimators'
+    param_range = [512]
+    dataset_name = dataset_name
+    model_name = 'Boosting'
+
+    _task_template(constructor_fn, default_params, param_grid, x_train, y_train,
+                   x_val, y_val, train_sizes, param_name, param_range,
+                   dataset_name, model_name, n_jobs)
+
+
+def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
+                        x_val: np.ndarray, y_val: np.ndarray,
+                        train_sizes: List[float], dataset_name: str,
+                        n_jobs: int):
+    in_features = x_train.shape[1]
+
+    path_to_state_dict = 'nn_mnist.pt'
+    if os.path.exists(path_to_state_dict):
+        nn = NeuralNetworkEstimator.from_state_dict(path_to_state_dict)
+    else:
+        default_params = {
+            'in_features': in_features,
+            'num_classes': 10,
+            'hidden_layers': [24] * 4,
+            'learning_rate': 1e-5,
+            'batch_size': 128,
+            'epochs': 100,
+            'verbose': True
+        }
+
+        param_grid = {'hidden_layers': [[16] * n for n in [2, 4, 8, 16]]}
+        best_score_kwargs = grid_search_nn(default_params, param_grid, x_train,
+                                           y_train, x_val, y_val)
+
+        nn = best_score_kwargs[2]
+        nn.save(path_to_state_dict)
+
+    loss_fig, acc_fig = training_curves(nn.training_log)
+    loss_fig.show()
+    acc_fig.show()
 
 
 def _task_template(constructor_fn: Callable[..., ModelType],
@@ -95,7 +181,11 @@ def _task_template(constructor_fn: Callable[..., ModelType],
     dt_gs = grid_search(model, param_grid, x_train, y_train, x_val, y_val,
                         n_jobs)
 
-    best_params = dt_gs.best_params_
+    logging.info(f'Best parameters found {dt_gs.best_params_}')
+
+    best_params = copy.deepcopy(default_params)
+    best_params.update(dt_gs.best_params_)
+
     model = constructor_fn(**best_params)
 
     logging.info(f'{dataset_name} - {model_name} - Training size curve')

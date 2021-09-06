@@ -55,8 +55,8 @@ def gen_2d_data(x1_max: float, x2_max: float, num_examples: int,
     return x_data, y_data
 
 
-def get_mnist(train: bool):
-    """Gets x_data, y_data of the MNIST dataset, resampled 5%
+def get_fashion_mnist(train: bool):
+    """Gets the Fashion MNIST dataset
 
     Args:
         train: If True, this function gets the training set. Otherwise,
@@ -70,17 +70,16 @@ def get_mnist(train: bool):
     """
     dir_name = 'mnist'
     os.makedirs(dir_name, exist_ok=True)
-    mnist = torchvision.datasets.MNIST(dir_name, train, download=True)
+    mnist = torchvision.datasets.FashionMNIST(dir_name, train, download=True)
     x = np.stack([np.array(x).flatten().copy() for x, _ in mnist])
     y = np.array([y for _, y in mnist])
 
     assert len(x) == len(y)
     num_examples = len(x)
 
-    # Resample 5% only
-    indices = np.arange(0, num_examples, 5)
+    # Adjust these lines if need a smaller dataset
+    indices = np.arange(0, num_examples, 1)
     x_resampled = x[indices]
     y_resampled = y[indices]
 
     return x_resampled, y_resampled
-

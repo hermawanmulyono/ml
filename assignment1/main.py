@@ -1,15 +1,13 @@
 import logging
 import multiprocessing
-import os
 
 import numpy as np
 import torch.random
 from sklearn.model_selection import train_test_split
 
-from utils.data import gen_2d_data, get_mnist
-from utils.models import get_nn
-from utils.nnestimator import training_curves, NeuralNetworkEstimator
-from utils.tasks import dt_task, knn_task
+from utils.data import gen_2d_data, get_fashion_mnist
+from utils.tasks import dt_task, knn_task, svm_poly_task, svm_rbf_task, \
+    boosting_task, neural_network_task
 
 
 def dataset1(n_jobs):
@@ -79,8 +77,8 @@ def dataset1(n_jobs):
 
 
 def dataset2(n_jobs):
-    mnist_x_train, mnist_y_train = get_mnist(train=True)
-    x_test, y_test = get_mnist(train=False)
+    mnist_x_train, mnist_y_train = get_fashion_mnist(train=True)
+    x_test, y_test = get_fashion_mnist(train=False)
 
     x_train, x_val, y_train, y_val = train_test_split(mnist_x_train,
                                                       mnist_y_train,
@@ -92,31 +90,18 @@ def dataset2(n_jobs):
 
     train_sizes = [0.2, 0.4, 0.6, 0.8, 1.0]
 
-    # dt_task(x_train, y_train, x_val, y_val, train_sizes, 'MNIST', n_jobs)
-    knn_task(x_train, y_train, x_val, y_val, train_sizes, 'MNIST', n_jobs)
-
-    in_features = x_train.shape[1]
-
-    path_to_state_dict = 'nn_mnist.pt'
-    if os.path.exists(path_to_state_dict):
-        nn = NeuralNetworkEstimator.from_state_dict(path_to_state_dict)
-    else:
-        nn = get_nn(in_features=in_features,
-                    num_classes=10,
-                    hidden_layers=[8, 16, 16, 8])
-        nn.fit(x_train,
-               y_train,
-               x_test,
-               y_test,
-               learning_rate=1e-5,
-               batch_size=128,
-               epochs=1000,
-               verbose=True)
-        nn.save(path_to_state_dict)
-
-    loss_fig, acc_fig = training_curves(nn.training_log)
-    loss_fig.show()
-    acc_fig.show()
+    # dt_task(x_train, y_train, x_val, y_val, train_sizes, 'Fashion-MNIST',
+    #         n_jobs)
+    # knn_task(x_train, y_train, x_val, y_val, train_sizes, 'Fashion-MNIST',
+    #          n_jobs)
+    # svm_poly_task(x_train, y_train, x_val, y_val, train_sizes, 'Fashion-MNIST',
+    #               n_jobs)
+    # svm_rbf_task(x_train, y_train, x_val, y_val, train_sizes, 'Fashion-MNIST',
+    #              n_jobs)
+    # boosting_task(x_train, y_train, x_val, y_val, train_sizes, 'Fashion-MNIST',
+    #               n_jobs)
+    neural_network_task(x_train, y_train, x_val, y_val, train_sizes,
+                        'Fashion-MNIST', n_jobs)
 
 
 if __name__ == '__main__':

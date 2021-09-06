@@ -1,6 +1,7 @@
 import copy
 import logging
 from typing import Tuple, Optional, Dict, List
+import math
 
 import progressbar
 import torch
@@ -245,6 +246,9 @@ class NeuralNetworkEstimator:
                 optimizer.step()
 
             self._update_training_log(x_train, y_train, x_val, y_val)
+
+            if math.isnan(self._training_log['train_loss'][-1]):
+                break
 
         if verbose:
             bar.finish()
