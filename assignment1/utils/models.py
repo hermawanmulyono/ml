@@ -143,7 +143,9 @@ def grid_search_nn(default_params: dict, param_grid: dict, x_train: np.ndarray,
         vall_acc = np.array(nn.training_log['val_accuracy'])
         vall_acc = vall_acc[np.logical_not(np.isnan(vall_acc))]
         score = np.max(vall_acc)
-        if best_score_kwargs[0] is None or best_score_kwargs[0] > score:
+        logging.info(f'Finished a training, score {score}')
+        if (best_score_kwargs[0] is None) or (best_score_kwargs[0] < score):
+            logging.info('Updating model')
             best_score_kwargs = (score, kwargs, nn)
 
         grid_index = increase(grid_index)
