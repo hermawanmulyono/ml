@@ -10,6 +10,9 @@ from utils.models import get_decision_tree, grid_search, get_knn, get_svm, \
 from utils.nnestimator import NeuralNetworkEstimator, training_curves
 from utils.plots import training_size_curve, complexity_curve, ModelType
 
+OUTPUT_DIRECTORY = 'outputs'
+os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
+
 
 def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
             y_val: np.ndarray, train_sizes: List[float], dataset_name: str,
@@ -121,7 +124,10 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
                         n_jobs: int):
     in_features = x_train.shape[1]
 
-    path_to_state_dict = 'nn_mnist.pt'
+    model_name = 'NN'
+
+    path_to_state_dict = f'{OUTPUT_DIRECTORY}/{model_name.lower()}' \
+                         f'_{dataset_name.lower()}.pt'
     if os.path.exists(path_to_state_dict):
         nn = NeuralNetworkEstimator.from_state_dict(path_to_state_dict)
     else:
@@ -135,7 +141,10 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
             'verbose': True
         }
 
-        param_grid = {'hidden_layers': [[16] * n for n in [2, 4, 8, 16]]}
+        param_grid = {
+            'hidden_layers': [[16] * n for n in [2, 4, 8, 16]],
+            'learning_rate': [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
+        }
         best_score_kwargs = grid_search_nn(default_params, param_grid, x_train,
                                            y_train, x_val, y_val)
 
@@ -143,8 +152,14 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
         nn.save(path_to_state_dict)
 
     loss_fig, acc_fig = training_curves(nn.training_log)
-    loss_fig.show()
-    acc_fig.show()
+
+    loss_fig_path = f'{OUTPUT_DIRECTORY}/loss_{model_name.lower()}' \
+                    f'_{dataset_name}.png'
+    loss_fig.write_image(loss_fig_path)
+
+    acc_fig_path = f'{OUTPUT_DIRECTORY}/acc_{model_name.lower()}' \
+                   f'_{dataset_name}.png'
+    acc_fig.write_image(acc_fig_path)
 
 
 def _task_template(constructor_fn: Callable[..., ModelType],
@@ -198,7 +213,9 @@ def _task_template(constructor_fn: Callable[..., ModelType],
         train_sizes,
         title=f'{dataset_name} - {model_name} Training Size Curve',
         n_jobs=n_jobs)
-    fig.show()
+    training_fig_path = f'{OUTPUT_DIRECTORY}/' \
+                        f'training_{model_name}_{dataset_name}.png'
+    fig.write_image(training_fig_path)
 
     logging.info(f'{dataset_name} - {model_name} - Complexity curve')
     fig = complexity_curve(
@@ -212,4 +229,6 @@ def _task_template(constructor_fn: Callable[..., ModelType],
         title=f'{dataset_name} - {model_name} Complexity Curve',
         log_scale=True,
         n_jobs=n_jobs)
-    fig.show()
+    complexity_fig_path = f'{OUTPUT_DIRECTORY}/' \
+                          f'complexity_{model_name}_{dataset_name}.png'
+    fig.write_image(complexity_fig_path)

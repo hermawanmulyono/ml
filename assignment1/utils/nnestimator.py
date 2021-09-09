@@ -183,6 +183,7 @@ class NeuralNetworkEstimator:
         model = sequential_nn(in_features, num_classes, hidden_layers)
 
         self._model = model
+        self._best_state_dict = model.state_dict()
         self._num_classes = num_classes
         self._device = torch.device(
             "cuda:0" if not torch.cuda.is_available() else "cpu")
@@ -246,9 +247,14 @@ class NeuralNetworkEstimator:
                 optimizer.step()
 
             self._update_training_log(x_train, y_train, x_val, y_val)
+            self._update_best_state_dict()
 
             if math.isnan(self._training_log['train_loss'][-1]):
+                logging.warning(f'Found a nan after {epoch} epoch')
                 break
+
+        # No matter what happens, we always try to use the best model
+        self._model.load_state_dict(self._best_state_dict)
 
         if verbose:
             bar.finish()
@@ -297,6 +303,43 @@ class NeuralNetworkEstimator:
         if x_val is not None and y_val is not None:
             _update(x_val, y_val, 'val')
 
+    def _update_best_state_dict(self):
+        """Updates the _best_state_dict attribute when appropriate
+
+        If x_val, y_val are given during training, use validation accuracy.
+        Otherwise, use training accuracy.
+
+        The update conditions are:
+          1. **Last** accuracy is not nan
+          2. **Last** accuracy is the best so far
+
+        Returns:
+            None.
+
+        """
+        assert self._training_log is not None, '_training_log should have ' \
+                                               'been initialized'
+
+        if self._training_log['val_accuracy']:
+            key = 'val_accuracy'
+        else:
+            key = 'train_accuracy'
+
+        accs = self._training_log[key]
+
+        assert accs, f'accs {accs} should not be empty'
+
+        if math.isnan(accs[-1]):
+            return  # It is nan, no need to update
+
+        if len(accs) > 1:
+            current_acc = accs[-1]
+            previous_accs = accs[:-1]
+            if np.max(previous_accs) >= current_acc:
+                return  # This is not the best model
+
+        self._best_state_dict = self._model.state_dict()
+
     def predict_proba(self, x_data: np.ndarray) -> np.ndarray:
         """Predicts the label probabilities from `x_data`
 
@@ -342,7 +385,7 @@ class NeuralNetworkEstimator:
 
     def save(self, path_to_state_dict: str):
         """Saves the current object into a state dictionary file"""
-        model_state_dict = self._model.state_dict()
+        model_state_dict = self._best_state_dict
         training_log_dict = self._training_log
         kwargs = self._kwargs
         state_dict = {
