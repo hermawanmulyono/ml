@@ -1,21 +1,15 @@
 import copy
-from typing import List, Union, Tuple, Dict, Any, Iterable
+from typing import List, Any, Iterable, Optional
 
 import numpy as np
 from plotly import graph_objects as go
-from sklearn.ensemble import AdaBoostClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import validation_curve, learning_curve
-from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
-from sklearn.tree import DecisionTreeClassifier
 from sklearn.utils import shuffle
 
-from utils.models import get_nn
-from utils.nnestimator import NeuralNetworkEstimator
-
-ModelType = Union[KNeighborsClassifier, SVC, DecisionTreeClassifier,
-                  AdaBoostClassifier, NeuralNetworkEstimator]
+from utils.grid_search import GridSearchResults, ModelType
+from utils.models import get_nn, get_svm
 
 
 def visualize_2d_data(x_data: np.ndarray,
@@ -366,4 +360,115 @@ def complexity_curve(model: ModelType,
         fig.update_xaxes(type='log')
 
     fig.update_layout({'title': title})
+    return fig
+
+
+def svm_training_curve_iteration(best_params: dict, x_train: np.ndarray,
+                                 y_train: np.ndarray, x_val: np.ndarray,
+                                 y_val: np.ndarray):
+    params = copy.deepcopy(best_params)
+
+    def equal(model1: SVC, model2: SVC):
+        """Tests equality of two SVC models"""
+        cond1 = np.array_equal(model1.intercept_, model2.intercept_)
+        cond2 = np.array_equal(model1.support_, model2.support_)
+        cond3 = np.array_equal(model1.dual_coef_, model2.dual_coef_)
+        return cond1 and cond2 and cond3
+
+    last_model: Optional[SVC] = None
+    params['verbose'] = True
+    model = get_svm(**params)
+    model.fit(x_train, y_train)
+
+    iters = []
+    train_accs = []
+    val_accs = []
+    iter_ = 0
+
+    while True:
+        iter_ += 1
+        params['max_iter'] = iter_
+        model = get_svm(**params)
+        model.fit(x_train, y_train)
+
+        # Update iters
+        iters.append(iter_)
+
+        # Update train_accs
+        y_pred = model.predict(x_train)
+        train_accs.append(accuracy_score(y_train, y_pred))
+
+        # Update val_accs
+        y_pred = model.predict(x_val)
+        val_accs.append(accuracy_score(y_val, y_pred))
+
+        # If converges, then break
+        if (last_model is not None) and equal(model, last_model):
+            break
+
+        last_model = model
+        continue
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=iters, y=y_train, mode='lines', name='train'))
+    fig.add_trace(go.Scatter(x=iters, y=y_val, mode='lines', name='val'))
+    fig.update_layout({'xaxis_title': 'Iterations', 'yaxis_title': 'Accuracy'})
+
+    return fig
+
+
+def gs_results_validation_curve(gs: GridSearchResults, param_name: str):
+    """Generates a validation curve
+
+    The GridSearchResults contains a table with information
+    about the train and val accuracy scores. The generated
+    plot has `param_name` on the x-axis and the corresponding
+    accuracy on the y-axis. The other parameters are derived
+    from the best parameters in the `gs` object.
+
+    Args:
+        gs: A GridSearchResults object
+        param_name: Parameter name to plot
+
+    Returns:
+        A graph object
+
+    """
+
+    best_params = gs.best_kwargs
+
+    other_params = {k: v for k, v in best_params.items() if k != param_name}
+
+    param_values = []
+    val_acc = []
+    train_acc = []
+
+    for params, d in gs.table:
+        _other_params = {k: v for k, v in params.items() if k != param_name}
+
+        if other_params != _other_params:
+            continue
+
+        train_acc.append(d['train_accuracy'])
+        val_acc.append(d['val_accuracy'])
+        param_values.append(d[param_name])
+
+    sort_indices = np.argsort(param_values)
+    sorted_param_values = [param_values[i] for i in sort_indices]
+    sorted_val_acc = [val_acc[i] for i in sort_indices]
+    sorted_train_acc = [train_acc[i] for i in sort_indices]
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(x=sorted_param_values,
+                   y=sorted_train_acc,
+                   mode='lines',
+                   name='train'))
+    fig.add_trace(
+        go.Scatter(x=sorted_param_values,
+                   y=sorted_val_acc,
+                   mode='lines',
+                   name='train'))
+
+    fig.update_layout({'xaxis_title': param_name, 'yaxis_title': 'Accuracy'})
     return fig

@@ -1,7 +1,7 @@
 # Assignment 1 - Supervised Learning
 
 TODO:
-1. Confusion matrices
+1. Confusion matrices --> Use confusion matrices
 2. NN fit times
 3. Validation curves + SVM hack
 4. Wall times

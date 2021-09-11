@@ -1,28 +1,60 @@
-import copy
 import json
 import logging
 import os
-import time
 
 import joblib
-import pickle
-from typing import List, Callable, Dict, Any, Iterable, NamedTuple, Optional, \
-    Tuple, Union
+from typing import List, Callable, Dict, Any, Iterable
 
 import numpy as np
 from sklearn.ensemble import AdaBoostClassifier
-from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import accuracy_score
 import plotly.graph_objects as go
+from sklearn.svm import SVC
 
+from utils.grid_search import GridSearchResults, grid_search, grid_search_nn, \
+    ModelType
 from utils.models import get_decision_tree, get_knn, get_svm, \
-    get_boosting, get_nn, SklearnModel
+    get_boosting
 from utils.nnestimator import NeuralNetworkEstimator, training_curves
-from utils.plots import training_size_curve, complexity_curve, ModelType, \
-    training_size_curve_nn
+from utils.plots import training_size_curve, complexity_curve, \
+    training_size_curve_nn, svm_training_curve_iteration, \
+    gs_results_validation_curve
 
 OUTPUT_DIRECTORY = 'outputs'
 os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
+
+
+def training_fig_path(model_name: str, dataset_name: str):
+    return f'{OUTPUT_DIRECTORY}/{model_name.lower()}' \
+           f'_{dataset_name.lower()}_training_size.png'
+
+
+def complexity_fig_path(model_name: str, dataset_name: str, param_name: str):
+    return f'{OUTPUT_DIRECTORY}/{model_name.lower()}_' \
+           f'{dataset_name.lower()}_complexity.png'
+
+
+def gs_results_filepath(model_name: str, dataset_name: str):
+    return f'{OUTPUT_DIRECTORY}/{model_name.lower()}_' \
+           f'{dataset_name.lower()}_gs.json'
+
+
+def model_file_path(model_name: str, dataset_name: str):
+    return f'{OUTPUT_DIRECTORY}/{model_name.lower()}_' \
+           f'{dataset_name.lower()}.joblib'
+
+
+def model_state_dict_path(model_name: str, dataset_name: str):
+    return f'{OUTPUT_DIRECTORY}/{model_name.lower()}_{dataset_name.lower()}.pt'
+
+
+def loss_fig_path(model_name: str, dataset_name: str):
+    return f'{OUTPUT_DIRECTORY}/{model_name.lower()}_' \
+           f'{dataset_name.lower()}_loss.png'
+
+
+def acc_fig_path(model_name: str, dataset_name: str):
+    return f'{OUTPUT_DIRECTORY}/{model_name.lower()}_' \
+           f'{dataset_name}_accuracy.png'
 
 
 def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
@@ -90,11 +122,23 @@ def svm_poly_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     param_name = 'degree'
     param_range = degree_values
     dataset_name = dataset_name
-    model_name = 'SVM - Polynomial'
+    model_name = 'SVM-Polynomial'
 
-    _task_template(constructor_fn, default_params, param_grid, x_train, y_train,
-                   x_val, y_val, train_sizes, param_name, param_range,
-                   dataset_name, model_name, n_jobs, retrain)
+    model: SVC = _task_template(constructor_fn, default_params, param_grid,
+                                x_train, y_train, x_val, y_val, train_sizes,
+                                param_name, param_range, dataset_name,
+                                model_name, n_jobs, retrain)
+
+    best_params = _gs_load(model_name, dataset_name)['best_kwargs']
+
+    # Plot accuracy figure
+    svm_accuracy_fig_path = acc_fig_path(model_name, dataset_name)
+    if retrain or (not os.path.exists(svm_accuracy_fig_path)):
+        fig = svm_training_curve_iteration(best_params, x_train, y_train,
+                                           x_val, y_val)
+        fig.update_layout(
+            {'title': f'{model_name} {dataset_name} training curve'})
+        fig.write_image(svm_accuracy_fig_path)
 
 
 def svm_rbf_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
@@ -112,11 +156,23 @@ def svm_rbf_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     param_name = 'gamma'
     param_range = gamma_values
     dataset_name = dataset_name
-    model_name = 'SVM - RBF'
+    model_name = 'SVM-RBF'
 
-    _task_template(constructor_fn, default_params, param_grid, x_train, y_train,
-                   x_val, y_val, train_sizes, param_name, param_range,
-                   dataset_name, model_name, n_jobs, retrain)
+    model: SVC = _task_template(constructor_fn, default_params, param_grid,
+                                x_train, y_train, x_val, y_val, train_sizes,
+                                param_name, param_range, dataset_name,
+                                model_name, n_jobs, retrain)
+
+    best_params = _gs_load(model_name, dataset_name)['best_kwargs']
+
+    # Plot accuracy figure
+    svm_accuracy_fig_path = acc_fig_path(model_name, dataset_name)
+    if retrain or (not os.path.exists(svm_accuracy_fig_path)):
+        fig = svm_training_curve_iteration(best_params, x_train, y_train,
+                                           x_val, y_val)
+        fig.update_layout(
+            {'title': f'{model_name} {dataset_name} training curve'})
+        fig.write_image(svm_accuracy_fig_path)
 
 
 def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
@@ -144,10 +200,13 @@ def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     val_iterations = [i for i, _ in enumerate(val_scores)]
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=train_iterations, y=train_scores,
-                             mode='lines', name='train'))
-    fig.add_trace(go.Scatter(x=val_iterations, y=val_scores,
-                             mode='lines', name='val'))
+    fig.add_trace(
+        go.Scatter(x=train_iterations,
+                   y=train_scores,
+                   mode='lines',
+                   name='train'))
+    fig.add_trace(
+        go.Scatter(x=val_iterations, y=val_scores, mode='lines', name='val'))
     fig.update_layout({
         'xaxis_title': 'Training size',
         'yaxis_title': 'Accuracy'
@@ -156,9 +215,8 @@ def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     fig.update_layout({'title': 'Boosting Validation curve'})
 
     # Overwrite the complexity figure path
-    complexity_fig_path = f'{OUTPUT_DIRECTORY}/' \
-                          f'{model_name}_{dataset_name}_complexity.png'
-    fig.write_image(complexity_fig_path)
+    fig_path = complexity_fig_path(model_name, dataset_name, param_name)
+    fig.write_image(fig_path)
 
 
 def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
@@ -169,8 +227,7 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
 
     model_name = 'NN'
 
-    path_to_state_dict = f'{OUTPUT_DIRECTORY}/{model_name.lower()}' \
-                         f'_{dataset_name.lower()}.pt'
+    path_to_state_dict = model_state_dict_path(model_name, dataset_name)
     if os.path.exists(path_to_state_dict):
         nn = NeuralNetworkEstimator.from_state_dict(path_to_state_dict)
     else:
@@ -209,21 +266,25 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
                                      y_val,
                                      train_sizes,
                                      title=training_size_fig_title)
-        training_fig_path = f'{OUTPUT_DIRECTORY}/' \
-                            f'{model_name}_{dataset_name}_training_size.png'
-        fig.write_image(training_fig_path)
+        fig_path = training_fig_path(model_name, dataset_name)
+        fig.write_image(fig_path)
 
         # Complexity curve
+        fig_path = complexity_fig_path(model_name, dataset_name,
+                                       'learning_rate')
+        if not os.path.exists(fig_path):
+            fig_learning_rate = gs_results_validation_curve(gs, 'learning_rate')
+            fig_learning_rate.write_image(fig_path)
+
+        # fig_hidden_layers = gs_results_validation_curve(gs, 'hidden_layers')
 
     loss_fig, acc_fig = training_curves(nn.training_log)
 
-    loss_fig_path = f'{OUTPUT_DIRECTORY}/loss_{model_name.lower()}' \
-                    f'_{dataset_name}.png'
-    loss_fig.write_image(loss_fig_path)
+    fig_path = loss_fig_path(model_name, dataset_name)
+    loss_fig.write_image(fig_path)
 
-    acc_fig_path = f'{OUTPUT_DIRECTORY}/acc_{model_name.lower()}' \
-                   f'_{dataset_name}.png'
-    acc_fig.write_image(acc_fig_path)
+    fig_path = acc_fig_path(model_name, dataset_name)
+    acc_fig.write_image(fig_path)
 
 
 def _task_template(constructor_fn: Callable[..., ModelType],
@@ -257,11 +318,9 @@ def _task_template(constructor_fn: Callable[..., ModelType],
 
     """
 
-    # Instantiate model
-    model_filename = f'{OUTPUT_DIRECTORY}/' \
-                     f'{model_name.lower()}_{dataset_name.lower()}.joblib'
+    saved_model_path = model_file_path(model_name, dataset_name)
 
-    if retrain or (not os.path.exists(model_filename)):
+    if retrain or (not os.path.exists(saved_model_path)):
         # Grid search
         logging.info(f'{dataset_name} - {model_name} - Grid search')
         gs = grid_search(constructor_fn, default_params, param_grid, x_train,
@@ -272,7 +331,7 @@ def _task_template(constructor_fn: Callable[..., ModelType],
 
         # Save best model
         model = gs.best_model
-        joblib.dump(model, model_filename)
+        joblib.dump(model, saved_model_path)
 
         # Training size curve
         logging.info(f'{dataset_name} - {model_name} - Training size curve')
@@ -285,9 +344,8 @@ def _task_template(constructor_fn: Callable[..., ModelType],
             train_sizes,
             title=f'{model_name} - {dataset_name} Training Size Curve',
             n_jobs=n_jobs)
-        training_fig_path = f'{OUTPUT_DIRECTORY}/' \
-                            f'{model_name}_{dataset_name}_training_size.png'
-        fig.write_image(training_fig_path)
+        fig_path = training_fig_path(model_name, dataset_name)
+        fig.write_image(fig_path)
 
         # Complexity curve
         logging.info(f'{dataset_name} - {model_name} - Complexity curve')
@@ -302,142 +360,15 @@ def _task_template(constructor_fn: Callable[..., ModelType],
             title=f'{dataset_name} - {model_name} Complexity Curve',
             log_scale=True,
             n_jobs=n_jobs)
-        complexity_fig_path = f'{OUTPUT_DIRECTORY}/' \
-                              f'{model_name}_{dataset_name}_complexity.png'
-        fig.write_image(complexity_fig_path)
+
+        fig_path = complexity_fig_path(model_name, dataset_name, param_name)
+        fig.write_image(fig_path)
 
     else:
-        logging.info(f'{model_filename} found. Loading model from disk.')
-        model = joblib.load(model_filename)
+        logging.info(f'{saved_model_path} found. Loading model from disk.')
+        model = joblib.load(saved_model_path)
 
     return model
-
-
-class GridSearchResults(NamedTuple):
-    best_accuracy: Optional[float]
-    best_kwargs: Optional[dict]
-    best_fit_time: Optional[float]
-    best_model: Optional[Union[NeuralNetworkEstimator, SklearnModel]]
-    table: List[Tuple[dict, dict]]
-
-
-def _increase_grid_index(grid_index_: List[int], param_grid: dict):
-    param_names: List[str] = list(param_grid.keys())
-
-    grid_index_ = copy.deepcopy(grid_index_)
-
-    for i in range(len(grid_index_)):
-        grid_index_[i] += 1
-
-        if grid_index_[i] >= len(param_grid[param_names[i]]):
-            grid_index_[i] = 0
-        else:
-            break
-
-    return grid_index_
-
-
-def grid_search(constructor_fn: Callable[..., ModelType], default_params: dict,
-                param_grid: dict, x_train: np.ndarray, y_train: np.ndarray,
-                x_val: np.ndarray, y_val: np.ndarray, n_jobs):
-
-    def fit_fn(**kwargs):
-        model = constructor_fn(**kwargs)
-        start = time.time()
-        model.fit(x_train, y_train)
-        end = time.time()
-        fit_time = end - start
-
-        return model, fit_time
-
-    results = _grid_search_template(fit_fn, default_params, param_grid, x_train,
-                                    y_train, x_val, y_val)
-
-    return results
-
-
-def grid_search_nn(default_params: dict, param_grid: dict, x_train: np.ndarray,
-                   y_train: np.ndarray, x_val: np.ndarray, y_val: np.ndarray):
-
-    def fit_fn(in_features, num_classes, hidden_layers, learning_rate,
-               batch_size, epochs, verbose):
-        nn_ = get_nn(in_features=in_features,
-                     num_classes=num_classes,
-                     hidden_layers=hidden_layers)
-        start = time.time()
-        nn_.fit(x_train,
-                y_train,
-                x_val,
-                y_val,
-                learning_rate=learning_rate,
-                batch_size=batch_size,
-                epochs=epochs,
-                verbose=verbose)
-        end = time.time()
-        fit_time = end - start
-
-        return nn_, fit_time
-
-    results = _grid_search_template(fit_fn, default_params, param_grid, x_train,
-                                    y_train, x_val, y_val)
-
-    return results
-
-
-def _grid_search_template(fit_fn: Callable[..., tuple], default_params: dict,
-                          param_grid: dict, x_train: np.ndarray,
-                          y_train: np.ndarray, x_val: np.ndarray,
-                          y_val: np.ndarray):
-
-    if len(x_train) != len(y_train):
-        raise ValueError
-
-    if len(x_val) != len(y_val):
-        raise ValueError
-
-    if x_train.shape[1] != x_val.shape[1]:
-        raise ValueError
-
-    param_names: List[str] = list(param_grid.keys())
-    grid_index = [0] * len(param_names)
-
-    best_accuracy: Optional[float] = None
-    best_kwargs: Optional[dict] = None
-    best_fit_time: Optional[float] = None
-    best_model: Optional[NeuralNetworkEstimator] = None
-    table: List[Tuple[dict, dict]] = []
-
-    while True:
-        kwargs = copy.deepcopy(default_params)
-        update = {
-            key: param_grid[key][gi] for gi, key in zip(grid_index, param_names)
-        }
-        kwargs.update(update)
-
-        logging.info(f'{kwargs}')
-
-        model, fit_time = fit_fn(**kwargs)
-
-        y_pred = model.predict(x_val)
-        accuracy = accuracy_score(y_val, y_pred)
-
-        table.append((kwargs, {'accuracy': accuracy, 'fit_time': fit_time}))
-
-        if (best_accuracy is None) or (best_accuracy < accuracy):
-            logging.info('Updating model')
-            best_accuracy = accuracy
-            best_fit_time = fit_time
-            best_kwargs = kwargs
-            best_model = model
-
-        grid_index = _increase_grid_index(grid_index, param_grid)
-        if all([gi == 0 for gi in grid_index]):
-            break
-
-    results = GridSearchResults(best_accuracy, best_kwargs, best_fit_time,
-                                best_model, table)
-
-    return results
 
 
 def _gs_results_to_json(gs: GridSearchResults, model_name: str,
@@ -448,7 +379,14 @@ def _gs_results_to_json(gs: GridSearchResults, model_name: str,
         'table': gs.table
     }
 
-    gs_results_filepath = f'{OUTPUT_DIRECTORY}/' \
-                          f'{model_name}_{dataset_name}_gs.json'
-    with open(gs_results_filepath, 'w') as file:
+    json_path = gs_results_filepath(model_name, dataset_name)
+    with open(json_path, 'w') as file:
         json.dump(gs_dict, file, indent=4)
+
+
+def _gs_load(model_name: str, dataset_name: str):
+    json_path = gs_results_filepath(model_name, dataset_name)
+    with open(json_path) as file:
+        d = json.load(file)
+
+    return d
