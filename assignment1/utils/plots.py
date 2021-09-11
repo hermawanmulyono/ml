@@ -33,8 +33,20 @@ def visualize_2d_data(x_data: np.ndarray,
     """
 
     fig = go.Figure()
-    fig = _add_scatter(fig, x_data, y_data, scatter_alpha=0.2, scatter_size=15)
-    fig.update_layout({'xaxis_title': 'x1', 'yaxis_title': 'x2'})
+    fig = _add_scatter(fig, x_data, y_data, scatter_alpha=0.2, scatter_size=7)
+    fig.update_layout({
+        'xaxis_title': 'x1',
+        'yaxis_title': 'x2',
+        'width': 960,
+        'height': 540
+    })
+
+    fig.update_layout(legend={
+        'yanchor': 'top',
+        'y': 0.99,
+        'xanchor': 'left',
+        'x': 0.01
+    })
 
     if title is not None:
         fig.update_layout({'title': title})

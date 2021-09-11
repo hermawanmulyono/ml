@@ -6,3 +6,4 @@ scikit-learn
 plotly>=5.2.1
 progressbar2
 scikit-image
+kaleido
