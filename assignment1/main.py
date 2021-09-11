@@ -120,8 +120,8 @@ def dataset2(train_dt: bool, train_boosting: bool, train_svm: bool,
             n_jobs, train_dt)
     knn_task(x_train, y_train, x_val, y_val, train_sizes, 'Fashion-MNIST',
              n_jobs, train_knn)
-    # svm_poly_task(x_train, y_train, x_val, y_val, train_sizes, 'Fashion-MNIST',
-    #               n_jobs, train_svm)
+    svm_poly_task(x_train, y_train, x_val, y_val, train_sizes, 'Fashion-MNIST',
+                  n_jobs, train_svm)
     svm_rbf_task(x_train, y_train, x_val, y_val, train_sizes, 'Fashion-MNIST',
                  n_jobs, train_svm)
     boosting_task(x_train, y_train, x_val, y_val, train_sizes, 'Fashion-MNIST',

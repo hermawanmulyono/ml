@@ -1,5 +1,5 @@
 import copy
-from typing import List, Union, Tuple, Dict, Any
+from typing import List, Union, Tuple, Dict, Any, Iterable
 
 import numpy as np
 from plotly import graph_objects as go
@@ -11,6 +11,7 @@ from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.utils import shuffle
 
+from utils.models import get_nn
 from utils.nnestimator import NeuralNetworkEstimator
 
 ModelType = Union[KNeighborsClassifier, SVC, DecisionTreeClassifier,
@@ -191,41 +192,79 @@ def training_size_curve(model: ModelType, x_train: np.ndarray,
 
     cv = [(np.arange(n_train), np.arange(n_train, n_concat))]
 
-    # def train_and_eval(size_: float) -> Tuple[float, float]:
-    #     # Copy so that the original model is intact
-    #     model_copy = copy.deepcopy(model)
-    #
-    #     n_train = int(size_ * len(x_train))
-    #
-    #     x_train_ = x_shuffle[:n_train]
-    #     y_train_ = y_shuffle[:n_train]
-    #
-    #     model_copy.fit(x_train_, y_train_)
-    #
-    #     y_pred_train_ = model_copy.predict(x_train_)
-    #     train_acc_ = accuracy_score(y_train_, y_pred_train_)
-    #
-    #     y_pred_val_ = model_copy.predict(x_val)
-    #     val_acc_ = accuracy_score(y_val, y_pred_val_)
-    #
-    #     return train_acc_, val_acc_
-
-    train_sizes_ags, train_accs_, val_accs_ = learning_curve(
-        model,
-        x_concat,
-        y_concat,
-        train_sizes=sizes,
-        cv=cv,
-        # scoring='accuracy',
-        n_jobs=n_jobs,
-        shuffle=True)
-
-    # train_val_accs = map(train_and_eval, sizes)
-    # train_accs, val_accs = zip(*train_val_accs)
+    train_sizes_ags, train_accs_, val_accs_ = learning_curve(model,
+                                                             x_concat,
+                                                             y_concat,
+                                                             train_sizes=sizes,
+                                                             cv=cv,
+                                                             n_jobs=n_jobs,
+                                                             shuffle=True)
 
     train_accs = train_accs_.flatten()
     val_accs = val_accs_.flatten()
 
+    fig = _generate_training_size_curve(sizes, train_accs, val_accs, title)
+
+    return fig
+
+
+def training_size_curve_nn(params: dict, x_train: np.ndarray,
+                           y_train: np.ndarray, x_val: np.ndarray,
+                           y_val: np.ndarray, sizes: List[float],
+                           title: str) -> go.Figure:
+
+    if len(x_train) != len(y_train):
+        raise ValueError
+
+    if len(x_val) != len(y_val):
+        raise ValueError
+
+    if x_train.shape[1] != x_val.shape[1]:
+        raise ValueError
+
+    if not all([0 <= s <= 1.0 for s in sizes]):
+        raise ValueError
+
+    num_examples = len(x_train)
+
+    x_train, y_train = shuffle(x_train, y_train)
+
+    lengths = [int(s * num_examples) for s in sizes]
+
+    train_accs: List[float] = []
+    val_accs: List[float] = []
+
+    for length in lengths:
+        x_train_sampled = x_train[:length]
+        y_train_sampled = y_train[:length]
+
+        # Fit a neural network
+        nn = get_nn(in_features=params['in_features'],
+                    num_classes=params['num_classes'],
+                    hidden_layers=params['hidden_layers'])
+        nn.fit(x_train_sampled,
+               y_train_sampled,
+               x_val,
+               y_val,
+               learning_rate=params['learning_rate'],
+               batch_size=params['batch_size'],
+               epochs=params['epochs'],
+               verbose=params['verbose'])
+
+        y_pred = nn.predict(x_train_sampled)
+        train_accs.append(accuracy_score(y_train_sampled, y_pred))
+
+        y_pred = nn.predict(x_val)
+        val_accs.append(accuracy_score(y_val, y_pred))
+
+    fig = _generate_training_size_curve(sizes, train_accs, val_accs, title)
+
+    return fig
+
+
+def _generate_training_size_curve(sizes: Iterable[float],
+                                  train_accs: Iterable[float],
+                                  val_accs: Iterable[float], title: str):
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=sizes, y=train_accs, mode='lines', name='train'))
     fig.add_trace(go.Scatter(x=sizes, y=val_accs, mode='lines', name='val'))

@@ -10,13 +10,16 @@ from typing import List, Callable, Dict, Any, Iterable, NamedTuple, Optional, \
     Tuple, Union
 
 import numpy as np
+from sklearn.ensemble import AdaBoostClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.metrics import accuracy_score
+import plotly.graph_objects as go
 
 from utils.models import get_decision_tree, get_knn, get_svm, \
     get_boosting, get_nn, SklearnModel
 from utils.nnestimator import NeuralNetworkEstimator, training_curves
-from utils.plots import training_size_curve, complexity_curve, ModelType
+from utils.plots import training_size_curve, complexity_curve, ModelType, \
+    training_size_curve_nn
 
 OUTPUT_DIRECTORY = 'outputs'
 os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
@@ -127,9 +130,35 @@ def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     dataset_name = dataset_name
     model_name = 'Boosting'
 
-    _task_template(constructor_fn, default_params, param_grid, x_train, y_train,
-                   x_val, y_val, train_sizes, param_name, param_range,
-                   dataset_name, model_name, n_jobs, retrain)
+    model: AdaBoostClassifier = _task_template(constructor_fn, default_params,
+                                               param_grid, x_train, y_train,
+                                               x_val, y_val, train_sizes,
+                                               param_name, param_range,
+                                               dataset_name, model_name, n_jobs,
+                                               retrain)
+
+    # Plot validation curve, which is some sort of iteration curve
+    train_scores = [s for s in model.staged_score(x_train, y_train)]
+    train_iterations = [i for i, _ in enumerate(train_scores)]
+    val_scores = [s for s in model.staged_score(x_val, y_val)]
+    val_iterations = [i for i, _ in enumerate(val_scores)]
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=train_iterations, y=train_scores,
+                             mode='lines', name='train'))
+    fig.add_trace(go.Scatter(x=val_iterations, y=val_scores,
+                             mode='lines', name='val'))
+    fig.update_layout({
+        'xaxis_title': 'Training size',
+        'yaxis_title': 'Accuracy'
+    })
+
+    fig.update_layout({'title': 'Boosting Validation curve'})
+
+    # Overwrite the complexity figure path
+    complexity_fig_path = f'{OUTPUT_DIRECTORY}/' \
+                          f'{model_name}_{dataset_name}_complexity.png'
+    fig.write_image(complexity_fig_path)
 
 
 def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
@@ -159,11 +188,32 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
             'hidden_layers': [[16] * n for n in [2, 4, 6, 8, 10, 12, 14, 16]],
             'learning_rate': [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
         }
-        best_score_kwargs_nn = grid_search_nn(default_params, param_grid,
-                                              x_train, y_train, x_val, y_val)
+        gs = grid_search_nn(default_params, param_grid, x_train, y_train, x_val,
+                            y_val)
 
-        nn = best_score_kwargs_nn.best_model
+        # Save results into JSON
+        _gs_results_to_json(gs, model_name, dataset_name)
+
+        # Save the best model
+        nn = gs.best_model
         nn.save(path_to_state_dict)
+
+        # Training size curve
+        logging.info(f'{dataset_name} - {model_name} - Training size curve')
+        training_size_fig_title = f'{model_name} - {dataset_name} ' \
+                                  f'Training Size Curve'
+        fig = training_size_curve_nn(gs.best_kwargs,
+                                     x_train,
+                                     y_train,
+                                     x_val,
+                                     y_val,
+                                     train_sizes,
+                                     title=training_size_fig_title)
+        training_fig_path = f'{OUTPUT_DIRECTORY}/' \
+                            f'{model_name}_{dataset_name}_training_size.png'
+        fig.write_image(training_fig_path)
+
+        # Complexity curve
 
     loss_fig, acc_fig = training_curves(nn.training_log)
 
@@ -218,28 +268,13 @@ def _task_template(constructor_fn: Callable[..., ModelType],
                          y_train, x_val, y_val, n_jobs)
 
         # Save results into JSON
-        gs_dict = {
-            'best_accuracy': gs.best_accuracy,
-            'best_kwargs': gs.best_kwargs,
-            'table': gs.table
-        }
-
-        # Save grid search results
-        gs_results_filepath = f'{OUTPUT_DIRECTORY}/' \
-                              f'{model_name}_{dataset_name}_gs.json'
-        with open(gs_results_filepath, 'w') as file:
-            json.dump(gs_dict, file, indent=4)
-
-        logging.info(f'Best parameters found {gs.best_kwargs}')
-        best_params = copy.deepcopy(default_params)
-        best_params.update(gs.best_kwargs)
-
-        # Instantiate object based on the best parameters
-        model = gs.best_model
+        _gs_results_to_json(gs, model_name, dataset_name)
 
         # Save best model
+        model = gs.best_model
         joblib.dump(model, model_filename)
 
+        # Training size curve
         logging.info(f'{dataset_name} - {model_name} - Training size curve')
         fig = training_size_curve(
             model,
@@ -248,12 +283,13 @@ def _task_template(constructor_fn: Callable[..., ModelType],
             x_val,
             y_val,
             train_sizes,
-            title=f'{dataset_name} - {model_name} Training Size Curve',
+            title=f'{model_name} - {dataset_name} Training Size Curve',
             n_jobs=n_jobs)
         training_fig_path = f'{OUTPUT_DIRECTORY}/' \
                             f'{model_name}_{dataset_name}_training_size.png'
         fig.write_image(training_fig_path)
 
+        # Complexity curve
         logging.info(f'{dataset_name} - {model_name} - Complexity curve')
         fig = complexity_curve(
             model,
@@ -314,8 +350,8 @@ def grid_search(constructor_fn: Callable[..., ModelType], default_params: dict,
 
         return model, fit_time
 
-    results = _grid_search_template(fit_fn, default_params, param_grid,
-                                    x_train, y_train, x_val, y_val)
+    results = _grid_search_template(fit_fn, default_params, param_grid, x_train,
+                                    y_train, x_val, y_val)
 
     return results
 
@@ -342,8 +378,8 @@ def grid_search_nn(default_params: dict, param_grid: dict, x_train: np.ndarray,
 
         return nn_, fit_time
 
-    results = _grid_search_template(fit_fn, default_params, param_grid,
-                                    x_train, y_train, x_val, y_val)
+    results = _grid_search_template(fit_fn, default_params, param_grid, x_train,
+                                    y_train, x_val, y_val)
 
     return results
 
@@ -402,3 +438,17 @@ def _grid_search_template(fit_fn: Callable[..., tuple], default_params: dict,
                                 best_model, table)
 
     return results
+
+
+def _gs_results_to_json(gs: GridSearchResults, model_name: str,
+                        dataset_name: str):
+    gs_dict = {
+        'best_accuracy': gs.best_accuracy,
+        'best_kwargs': gs.best_kwargs,
+        'table': gs.table
+    }
+
+    gs_results_filepath = f'{OUTPUT_DIRECTORY}/' \
+                          f'{model_name}_{dataset_name}_gs.json'
+    with open(gs_results_filepath, 'w') as file:
+        json.dump(gs_dict, file, indent=4)
