@@ -380,6 +380,8 @@ def svm_training_curve_iteration(best_params: dict, x_train: np.ndarray,
     model = get_svm(**params)
     model.fit(x_train, y_train)
 
+    params['verbose'] = False
+
     iters = []
     train_accs = []
     val_accs = []
