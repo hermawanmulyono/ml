@@ -119,8 +119,6 @@ def _grid_search_template(fit_fn: Callable[..., tuple], default_params: dict,
         }
         kwargs.update(update)
 
-        logging.info(f'{kwargs}')
-
         model, fit_time = fit_fn(**kwargs)
 
         y_pred = model.predict(x_train)

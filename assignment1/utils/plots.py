@@ -1,13 +1,16 @@
 import copy
+import logging
 from typing import List, Any, Iterable, Optional
 
 import numpy as np
 import plotly.figure_factory as ff
 from plotly import graph_objects as go
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.model_selection import validation_curve, learning_curve
 from sklearn.svm import SVC
 from sklearn.utils import shuffle
+from sklearn.utils._testing import ignore_warnings
 
 from utils.grid_search import GridSearchResults, ModelType
 from utils.models import get_nn, get_svm
@@ -364,9 +367,31 @@ def complexity_curve(model: ModelType,
     return fig
 
 
+# Decorator trick from the following Stack Overflow post
+# https://stackoverflow.com/questions/53784971/how-to-disable-convergencewarning-using-sklearn
+@ignore_warnings(category=ConvergenceWarning)
 def svm_training_curve_iteration(best_params: dict, x_train: np.ndarray,
                                  y_train: np.ndarray, x_val: np.ndarray,
                                  y_val: np.ndarray):
+    """Generates an SVM training curve
+
+    The curve has the following characteristics:
+      1. x-axis is number of iterations
+      2. y-axis is accuracy
+      3. Train and Val sets are plotted
+
+    Args:
+        best_params: Best parameters for the SVM constructor
+        x_train: Training features
+        y_train: Training labels
+        x_val: Validation features
+        y_val: Validation labels
+
+    Returns:
+        A graph object with a curve described above
+
+    """
+
     params = copy.deepcopy(best_params)
 
     def equal(model1: SVC, model2: SVC):
@@ -390,6 +415,9 @@ def svm_training_curve_iteration(best_params: dict, x_train: np.ndarray,
 
     while True:
         iter_ += 10
+
+        logging.info(f'SVM training curve iteration {iter_}')
+
         params['max_iter'] = iter_
         model = get_svm(**params)
         model.fit(x_train, y_train)
@@ -420,7 +448,8 @@ def svm_training_curve_iteration(best_params: dict, x_train: np.ndarray,
     return fig
 
 
-def gs_results_validation_curve(gs: GridSearchResults, param_name: str):
+def gs_results_validation_curve(gs: GridSearchResults, param_name: str,
+                                plot_title):
     """Generates a validation curve
 
     The GridSearchResults contains a table with information
@@ -430,6 +459,7 @@ def gs_results_validation_curve(gs: GridSearchResults, param_name: str):
     from the best parameters in the `gs` object.
 
     Args:
+        plot_title:
         gs: A GridSearchResults object
         param_name: Parameter name to plot
 
@@ -454,7 +484,7 @@ def gs_results_validation_curve(gs: GridSearchResults, param_name: str):
 
         train_acc.append(d['train_accuracy'])
         val_acc.append(d['val_accuracy'])
-        param_values.append(d[param_name])
+        param_values.append(params[param_name])
 
     sort_indices = np.argsort(param_values)
     sorted_param_values = [param_values[i] for i in sort_indices]
@@ -477,15 +507,15 @@ def gs_results_validation_curve(gs: GridSearchResults, param_name: str):
     return fig
 
 
-def model_confusion_matrix(model: ModelType, x_test: np.ndarray,
-                           y_test: np.ndarray, labels: List[str]):
+def model_confusion_matrix(y_pred: np.ndarray, y_test: np.ndarray,
+                           labels: List[str], plot_title: str):
     """Generates a model confusion matrix
 
     Args:
-        model: Model instance
-        x_test: Test set features
+        y_pred: Predicted labels
         y_test: Test set labels
         labels: Ordered label strings
+        plot_title: Plot title string
 
     Returns:
         A figure object
@@ -494,10 +524,21 @@ def model_confusion_matrix(model: ModelType, x_test: np.ndarray,
 
     # Code inspired from
     # https://stackoverflow.com/questions/60860121/plotly-how-to-make-an-annotated-confusion-matrix-using-a-heatmap
-    y_pred = model.predict(x_test)
     cm: np.ndarray = confusion_matrix(y_test, y_pred)
     z_text = [[str(y) for y in x] for x in cm]
     fig = ff.create_annotated_heatmap(cm, labels, labels,
-                                      annotation_text=z_text)
+                                      annotation_text=z_text,
+                                      colorscale='blues',
+                                      reversescale=True)
+
+    fig['layout']['yaxis']['autorange'] = 'reversed'
+
+    fig.update_layout({
+        'xaxis_title': 'predicted',
+        'yaxis_title': 'ground truth',
+        'width': 960,
+        'height': 540,
+        'title': plot_title
+    })
 
     return fig

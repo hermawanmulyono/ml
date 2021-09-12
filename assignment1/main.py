@@ -51,7 +51,7 @@ def dataset1(train_dt: bool, train_boosting: bool, train_svm: bool,
     exit()
 
     dt_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-            'Dataset2D', n_jobs, train_dt)
+            'Dataset2D', dataset_labels, n_jobs, train_dt)
 
     # dt.fit(x_train, y_train)
 
@@ -111,6 +111,8 @@ def dataset2(train_dt: bool, train_boosting: bool, train_svm: bool,
                                                       mnist_y_train,
                                                       test_size=0.2)
 
+    dataset_labels = [f'{i}' for i in range(10)]
+
     assert len(x_train) == len(y_train)
     assert len(x_val) == len(y_val)
     assert x_train.shape[1] == x_val.shape[1] == x_test.shape[1]
@@ -118,17 +120,18 @@ def dataset2(train_dt: bool, train_boosting: bool, train_svm: bool,
     train_sizes = [0.2, 0.4, 0.6, 0.8, 1.0]
 
     dt_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-            'Fashion-MNIST', n_jobs, train_dt)
+            'Fashion-MNIST', dataset_labels, n_jobs, train_dt)
     knn_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-             'Fashion-MNIST', n_jobs, train_knn)
+             'Fashion-MNIST', dataset_labels, n_jobs, train_knn)
     svm_poly_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                  'Fashion-MNIST', n_jobs, train_svm)
+                  'Fashion-MNIST', dataset_labels, n_jobs, train_svm)
     svm_rbf_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                 'Fashion-MNIST', n_jobs, train_svm)
+                 'Fashion-MNIST', dataset_labels, n_jobs, train_svm)
     boosting_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                  'Fashion-MNIST', n_jobs, train_boosting)
+                  'Fashion-MNIST', dataset_labels, n_jobs, train_boosting)
     neural_network_task(x_train, y_train, x_val, y_val, x_test, y_test,
-                        train_sizes, 'Fashion-MNIST', n_jobs, train_nn)
+                        train_sizes, 'Fashion-MNIST', dataset_labels, n_jobs,
+                        train_nn)
 
 
 def parse_args():
