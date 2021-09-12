@@ -17,7 +17,7 @@ from utils.models import get_decision_tree, get_knn, get_svm, \
 from utils.nnestimator import NeuralNetworkEstimator, training_curves
 from utils.plots import training_size_curve, complexity_curve, \
     training_size_curve_nn, svm_training_curve_iteration, \
-    gs_results_validation_curve
+    gs_results_validation_curve, model_confusion_matrix
 
 OUTPUT_DIRECTORY = 'outputs'
 os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
@@ -54,12 +54,17 @@ def loss_fig_path(model_name: str, dataset_name: str):
 
 def acc_fig_path(model_name: str, dataset_name: str):
     return f'{OUTPUT_DIRECTORY}/{model_name.lower()}_' \
-           f'{dataset_name}_accuracy.png'
+           f'{dataset_name.lower()}_accuracy.png'
+
+
+def confusion_matrix_fig_path(model_name: str, dataset_name: str):
+    return f'{OUTPUT_DIRECTORY}/{model_name.lower()}_' \
+           f'{dataset_name.lower()}_confusion_matrix.png'
 
 
 def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
-            y_val: np.ndarray, train_sizes: List[float], dataset_name: str,
-            n_jobs: int, retrain: bool):
+            y_val: np.ndarray, x_test, y_test, train_sizes: List[float],
+            dataset_name: str, n_jobs: int, retrain: bool):
     """Task for decision tree
 
     The tasks are:
@@ -69,6 +74,8 @@ def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
 
     Args:
+        x_test:
+        y_test:
         x_train: Training set features
         y_train: Training set labels
         x_val: Validation set features
@@ -91,13 +98,13 @@ def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     model_name = 'DT'
 
     _task_template(constructor_fn, default_params, param_grid, x_train, y_train,
-                   x_val, y_val, train_sizes, param_name, param_range,
-                   dataset_name, model_name, n_jobs, retrain)
+                   x_val, y_val, x_test, y_test, train_sizes, param_name,
+                   param_range, dataset_name, model_name, n_jobs, retrain)
 
 
 def knn_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
-             y_val: np.ndarray, train_sizes: List[float], dataset_name: str,
-             n_jobs: int, retrain: bool):
+             y_val: np.ndarray, x_test, y_test, train_sizes: List[float],
+             dataset_name: str, n_jobs: int, retrain: bool):
     constructor_fn = get_knn
     default_params = {'n_neighbors': 9}
     k_values = [2**p + 1 for p in range(6)]
@@ -108,12 +115,12 @@ def knn_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     model_name = 'KNN'
 
     _task_template(constructor_fn, default_params, param_grid, x_train, y_train,
-                   x_val, y_val, train_sizes, param_name, param_range,
-                   dataset_name, model_name, n_jobs, retrain)
+                   x_val, y_val, x_test, y_test, train_sizes, param_name,
+                   param_range, dataset_name, model_name, n_jobs, retrain)
 
 
 def svm_poly_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
-                  y_val: np.ndarray, train_sizes: List[float],
+                  y_val: np.ndarray, x_test, y_test, train_sizes: List[float],
                   dataset_name: str, n_jobs: int, retrain: bool):
     constructor_fn = get_svm
     default_params = {'kernel': 'poly'}
@@ -125,9 +132,9 @@ def svm_poly_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     model_name = 'SVM-Polynomial'
 
     model: SVC = _task_template(constructor_fn, default_params, param_grid,
-                                x_train, y_train, x_val, y_val, train_sizes,
-                                param_name, param_range, dataset_name,
-                                model_name, n_jobs, retrain)
+                                x_train, y_train, x_val, y_val, x_test, y_test,
+                                train_sizes, param_name, param_range,
+                                dataset_name, model_name, n_jobs, retrain)
 
     best_params = _gs_load(model_name, dataset_name)['best_kwargs']
 
@@ -142,8 +149,8 @@ def svm_poly_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
 
 def svm_rbf_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
-                 y_val: np.ndarray, train_sizes: List[float], dataset_name: str,
-                 n_jobs: int, retrain: bool):
+                 y_val: np.ndarray, x_test, y_test, train_sizes: List[float],
+                 dataset_name: str, n_jobs: int, retrain: bool):
     constructor_fn = get_svm
 
     # Equivalent to "scale" option in scikit-learn
@@ -159,9 +166,9 @@ def svm_rbf_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     model_name = 'SVM-RBF'
 
     model: SVC = _task_template(constructor_fn, default_params, param_grid,
-                                x_train, y_train, x_val, y_val, train_sizes,
-                                param_name, param_range, dataset_name,
-                                model_name, n_jobs, retrain)
+                                x_train, y_train, x_val, y_val, x_test, y_test,
+                                train_sizes, param_name, param_range,
+                                dataset_name, model_name, n_jobs, retrain)
 
     best_params = _gs_load(model_name, dataset_name)['best_kwargs']
 
@@ -176,7 +183,7 @@ def svm_rbf_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
 
 def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
-                  y_val: np.ndarray, train_sizes: List[float],
+                  y_val: np.ndarray, x_test, y_test, train_sizes: List[float],
                   dataset_name: str, n_jobs: int, retrain: bool):
     constructor_fn = get_boosting
     default_params = {'n_estimators': 256, 'ccp_alpha': 0.001}
@@ -188,10 +195,10 @@ def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
     model: AdaBoostClassifier = _task_template(constructor_fn, default_params,
                                                param_grid, x_train, y_train,
-                                               x_val, y_val, train_sizes,
-                                               param_name, param_range,
-                                               dataset_name, model_name, n_jobs,
-                                               retrain)
+                                               x_val, y_val, x_test, y_test,
+                                               train_sizes, param_name,
+                                               param_range, dataset_name,
+                                               model_name, n_jobs, retrain)
 
     # Plot validation curve, which is some sort of iteration curve
     train_scores = [s for s in model.staged_score(x_train, y_train)]
@@ -220,7 +227,7 @@ def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
 
 def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
-                        x_val: np.ndarray, y_val: np.ndarray,
+                        x_val: np.ndarray, y_val: np.ndarray, x_test, y_test,
                         train_sizes: List[float], dataset_name: str,
                         n_jobs: int, retrain: bool):
     in_features = x_train.shape[1]
@@ -290,12 +297,14 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
 def _task_template(constructor_fn: Callable[..., ModelType],
                    default_params: Dict[str, Any], param_grid: Dict[str, Any],
                    x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
-                   y_val: np.ndarray, train_sizes: List[float], param_name: str,
-                   param_range: Iterable, dataset_name: str, model_name: str,
-                   n_jobs: int, retrain: bool):
+                   y_val: np.ndarray, x_test, y_test, train_sizes: List[float],
+                   param_name: str, param_range: Iterable, dataset_name: str,
+                   model_name: str, n_jobs: int, retrain: bool):
     """Template function for the tasks for different models
 
     Args:
+        x_test:
+        y_test:
         constructor_fn: `constructor_fn(**default_params)` gives a default model
             object
         default_params: `constructor_fn(**default_params)` gives a default model
@@ -367,6 +376,14 @@ def _task_template(constructor_fn: Callable[..., ModelType],
     else:
         logging.info(f'{saved_model_path} found. Loading model from disk.')
         model = joblib.load(saved_model_path)
+
+    # Hack! Figure out label strings from the y_test
+    num_labels = len(set(y_test))
+    label_strings = [f'{n}' for n in range(num_labels)]
+    fig = model_confusion_matrix(model, x_test, y_test, label_strings)
+    cm_fig_path = confusion_matrix_fig_path(model_name, dataset_name)
+    fig.show()
+    fig.write_image(cm_fig_path)
 
     return model
 

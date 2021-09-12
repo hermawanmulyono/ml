@@ -2,8 +2,9 @@ import copy
 from typing import List, Any, Iterable, Optional
 
 import numpy as np
+import plotly.figure_factory as ff
 from plotly import graph_objects as go
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.model_selection import validation_curve, learning_curve
 from sklearn.svm import SVC
 from sklearn.utils import shuffle
@@ -388,7 +389,7 @@ def svm_training_curve_iteration(best_params: dict, x_train: np.ndarray,
     iter_ = 0
 
     while True:
-        iter_ += 1
+        iter_ += 10
         params['max_iter'] = iter_
         model = get_svm(**params)
         model.fit(x_train, y_train)
@@ -412,8 +413,8 @@ def svm_training_curve_iteration(best_params: dict, x_train: np.ndarray,
         continue
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=iters, y=y_train, mode='lines', name='train'))
-    fig.add_trace(go.Scatter(x=iters, y=y_val, mode='lines', name='val'))
+    fig.add_trace(go.Scatter(x=iters, y=train_accs, mode='lines', name='train'))
+    fig.add_trace(go.Scatter(x=iters, y=val_accs, mode='lines', name='val'))
     fig.update_layout({'xaxis_title': 'Iterations', 'yaxis_title': 'Accuracy'})
 
     return fig
@@ -473,4 +474,30 @@ def gs_results_validation_curve(gs: GridSearchResults, param_name: str):
                    name='train'))
 
     fig.update_layout({'xaxis_title': param_name, 'yaxis_title': 'Accuracy'})
+    return fig
+
+
+def model_confusion_matrix(model: ModelType, x_test: np.ndarray,
+                           y_test: np.ndarray, labels: List[str]):
+    """Generates a model confusion matrix
+
+    Args:
+        model: Model instance
+        x_test: Test set features
+        y_test: Test set labels
+        labels: Ordered label strings
+
+    Returns:
+        A figure object
+
+    """
+
+    # Code inspired from
+    # https://stackoverflow.com/questions/60860121/plotly-how-to-make-an-annotated-confusion-matrix-using-a-heatmap
+    y_pred = model.predict(x_test)
+    cm: np.ndarray = confusion_matrix(y_test, y_pred)
+    z_text = [[str(y) for y in x] for x in cm]
+    fig = ff.create_annotated_heatmap(cm, labels, labels,
+                                      annotation_text=z_text)
+
     return fig

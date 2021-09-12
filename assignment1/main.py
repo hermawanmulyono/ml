@@ -50,7 +50,8 @@ def dataset1(train_dt: bool, train_boosting: bool, train_svm: bool,
 
     exit()
 
-    dt_task(x_train, y_train, x_val, y_val, train_sizes, 'Dataset2D', n_jobs)
+    dt_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
+            'Dataset2D', n_jobs, train_dt)
 
     # dt.fit(x_train, y_train)
 
@@ -116,18 +117,18 @@ def dataset2(train_dt: bool, train_boosting: bool, train_svm: bool,
 
     train_sizes = [0.2, 0.4, 0.6, 0.8, 1.0]
 
-    dt_task(x_train, y_train, x_val, y_val, train_sizes, 'Fashion-MNIST',
-            n_jobs, train_dt)
-    knn_task(x_train, y_train, x_val, y_val, train_sizes, 'Fashion-MNIST',
-             n_jobs, train_knn)
-    svm_poly_task(x_train, y_train, x_val, y_val, train_sizes, 'Fashion-MNIST',
-                  n_jobs, train_svm)
-    svm_rbf_task(x_train, y_train, x_val, y_val, train_sizes, 'Fashion-MNIST',
-                 n_jobs, train_svm)
-    boosting_task(x_train, y_train, x_val, y_val, train_sizes, 'Fashion-MNIST',
-                  n_jobs, train_boosting)
-    neural_network_task(x_train, y_train, x_val, y_val, train_sizes,
-                        'Fashion-MNIST', n_jobs, train_nn)
+    dt_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
+            'Fashion-MNIST', n_jobs, train_dt)
+    knn_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
+             'Fashion-MNIST', n_jobs, train_knn)
+    svm_poly_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
+                  'Fashion-MNIST', n_jobs, train_svm)
+    svm_rbf_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
+                 'Fashion-MNIST', n_jobs, train_svm)
+    boosting_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
+                  'Fashion-MNIST', n_jobs, train_boosting)
+    neural_network_task(x_train, y_train, x_val, y_val, x_test, y_test,
+                        train_sizes, 'Fashion-MNIST', n_jobs, train_nn)
 
 
 def parse_args():
