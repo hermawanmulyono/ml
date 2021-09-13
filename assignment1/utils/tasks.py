@@ -1,14 +1,13 @@
+from typing import List, Callable, Dict, Any, Iterable
 import json
 import logging
 import os
-
 import joblib
-from typing import List, Callable, Dict, Any, Iterable
 
 import numpy as np
 from sklearn.ensemble import AdaBoostClassifier
 import plotly.graph_objects as go
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.svm import SVC
 
 import utils.nnestimator as nnestimator
@@ -16,51 +15,12 @@ from utils.grid_search import GridSearchResults, grid_search, grid_search_nn, \
     ModelType
 from utils.models import get_decision_tree, get_knn, get_svm, \
     get_boosting
-from utils.plots import training_size_curve, complexity_curve, \
-    training_size_curve_nn, svm_training_curve_iteration, \
-    gs_results_validation_curve, model_confusion_matrix
-
-OUTPUT_DIRECTORY = 'outputs'
-os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
-
-
-def training_fig_path(model_name: str, dataset_name: str):
-    return f'{OUTPUT_DIRECTORY}/{model_name.lower()}' \
-           f'_{dataset_name.lower()}_training_size.png'
-
-
-def validation_fig_path(model_name: str, dataset_name: str, param_name: str):
-    return f'{OUTPUT_DIRECTORY}/{model_name.lower()}_' \
-           f'{dataset_name.lower()}_{param_name}_validation.png'
-
-
-def gs_results_filepath(model_name: str, dataset_name: str):
-    return f'{OUTPUT_DIRECTORY}/{model_name.lower()}_' \
-           f'{dataset_name.lower()}_gs.json'
-
-
-def model_file_path(model_name: str, dataset_name: str):
-    return f'{OUTPUT_DIRECTORY}/{model_name.lower()}_' \
-           f'{dataset_name.lower()}.joblib'
-
-
-def model_state_dict_path(model_name: str, dataset_name: str):
-    return f'{OUTPUT_DIRECTORY}/{model_name.lower()}_{dataset_name.lower()}.pt'
-
-
-def loss_fig_path(model_name: str, dataset_name: str):
-    return f'{OUTPUT_DIRECTORY}/{model_name.lower()}_' \
-           f'{dataset_name.lower()}_loss.png'
-
-
-def acc_fig_path(model_name: str, dataset_name: str):
-    return f'{OUTPUT_DIRECTORY}/{model_name.lower()}_' \
-           f'{dataset_name.lower()}_accuracy.png'
-
-
-def confusion_matrix_fig_path(model_name: str, dataset_name: str):
-    return f'{OUTPUT_DIRECTORY}/{model_name.lower()}_' \
-           f'{dataset_name.lower()}_confusion_matrix.png'
+from utils.output_files import training_fig_path, validation_fig_path, \
+    gs_results_filepath, model_file_path, model_state_dict_path, \
+    loss_fig_path, acc_fig_path, confusion_matrix_fig_path, test_json_path
+from utils.plots import training_size_curve, training_size_curve_nn, \
+    svm_training_curve_iteration, gs_results_validation_curve, \
+    model_confusion_matrix
 
 
 def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
@@ -103,10 +63,9 @@ def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
                         y_train, x_val, y_val, train_sizes, param_name,
                         param_range, dataset_name, model_name, n_jobs, retrain)
 
-    test_accuracy = _test_task(model, x_test, y_test, model_name, dataset_name,
-                               dataset_labels)
+    _test_task(model, x_test, y_test, model_name, dataset_name, dataset_labels)
 
-    return test_accuracy
+    return model
 
 
 def knn_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
@@ -125,10 +84,9 @@ def knn_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
                         y_train, x_val, y_val, train_sizes, param_name,
                         param_range, dataset_name, model_name, n_jobs, retrain)
 
-    test_accuracy = _test_task(model, x_test, y_test, model_name, dataset_name,
-                               dataset_labels)
+    _test_task(model, x_test, y_test, model_name, dataset_name, dataset_labels)
 
-    return test_accuracy
+    return model
 
 
 def svm_poly_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
@@ -160,10 +118,9 @@ def svm_poly_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
             {'title': f'{model_name} {dataset_name} training curve'})
         fig.write_image(svm_accuracy_fig_path)
 
-    test_accuracy = _test_task(model, x_test, y_test, model_name, dataset_name,
-                               dataset_labels)
+    _test_task(model, x_test, y_test, model_name, dataset_name, dataset_labels)
 
-    return test_accuracy
+    return model
 
 
 def svm_rbf_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
@@ -199,10 +156,9 @@ def svm_rbf_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
             {'title': f'{model_name} {dataset_name} training curve'})
         fig.write_image(svm_accuracy_fig_path)
 
-    test_accuracy = _test_task(model, x_test, y_test, model_name, dataset_name,
-                               dataset_labels)
+    _test_task(model, x_test, y_test, model_name, dataset_name, dataset_labels)
 
-    return test_accuracy
+    return model
 
 
 def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
@@ -248,10 +204,9 @@ def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     fig_path = validation_fig_path(model_name, dataset_name, param_name)
     fig.write_image(fig_path)
 
-    test_accuracy = _test_task(model, x_test, y_test, model_name, dataset_name,
-                               dataset_labels)
+    _test_task(model, x_test, y_test, model_name, dataset_name, dataset_labels)
 
-    return test_accuracy
+    return model
 
 
 def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
@@ -306,8 +261,7 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
         fig.write_image(fig_path)
 
     # Validation curve
-    fig_path = validation_fig_path(model_name, dataset_name,
-                                   'learning_rate')
+    fig_path = validation_fig_path(model_name, dataset_name, 'learning_rate')
     gs = GridSearchResults(**_gs_load(model_name, dataset_name),
                            best_model=nn_model)
     if not os.path.exists(fig_path):
@@ -326,10 +280,10 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
     acc_fig.write_image(fig_path)
 
     # Test task
-    test_accuracy = _test_task(nn_model, x_test, y_test, model_name,
-                               dataset_name, dataset_labels)
+    _test_task(nn_model, x_test, y_test, model_name, dataset_name,
+               dataset_labels)
 
-    return test_accuracy
+    return nn_model
 
 
 def _train_task(constructor_fn: Callable[...,
@@ -403,8 +357,7 @@ def _train_task(constructor_fn: Callable[...,
     # Validation curve
     logging.info(f'{dataset_name} - {model_name} - Validation curve')
 
-    fig_path = validation_fig_path(model_name, dataset_name,
-                                   'learning_rate')
+    fig_path = validation_fig_path(model_name, dataset_name, 'learning_rate')
     gs = GridSearchResults(**_gs_load(model_name, dataset_name),
                            best_model=model)
     if not os.path.exists(fig_path):
@@ -412,21 +365,6 @@ def _train_task(constructor_fn: Callable[...,
         fig_learning_rate = gs_results_validation_curve(gs, param_name,
                                                         plot_title)
         fig_learning_rate.write_image(fig_path)
-
-    # fig = complexity_curve(
-    #     model,
-    #     x_train,
-    #     y_train,
-    #     x_val,
-    #     y_val,
-    #     param_name=param_name,
-    #     param_range=param_range,
-    #     title=f'{dataset_name} - {model_name} Complexity Curve',
-    #     log_scale=True,
-    #     n_jobs=n_jobs)
-    #
-    # fig_path = validation_fig_path(model_name, dataset_name, param_name)
-    # fig.write_image(fig_path)
 
     return model
 
@@ -450,19 +388,30 @@ def _test_task(model: ModelType, x_test: np.ndarray, y_test: np.ndarray,
     """
 
     y_pred = model.predict(x_test)
+    cm: np.ndarray = confusion_matrix(y_test, y_pred)
 
     plot_title = f'{model_name} {dataset_name} confusion matrix'
-    fig = model_confusion_matrix(y_pred, y_test, dataset_labels, plot_title)
+    fig = model_confusion_matrix(cm, dataset_labels, plot_title)
     cm_fig_path = confusion_matrix_fig_path(model_name, dataset_name)
     fig.write_image(cm_fig_path)
 
     test_accuracy = accuracy_score(y_test, y_pred)
+
+    test_json = {
+        'test_accuracy': float(test_accuracy),
+        'confusion_matrix': cm.astype(int).tolist()
+    }
+
+    test_json_file_path = test_json_path(model_name, dataset_name)
+    with open(test_json_file_path, 'w') as file:
+        json.dump(test_json, file, indent=4)
 
     return test_accuracy
 
 
 def _gs_results_to_json(gs: GridSearchResults, model_name: str,
                         dataset_name: str):
+    """Saves grid search results JSON file"""
     gs_dict = {
         'best_accuracy': gs.best_accuracy,
         'best_kwargs': gs.best_kwargs,
@@ -476,6 +425,7 @@ def _gs_results_to_json(gs: GridSearchResults, model_name: str,
 
 
 def _gs_load(model_name: str, dataset_name: str):
+    """Saves grid search results JSON file"""
     json_path = gs_results_filepath(model_name, dataset_name)
     with open(json_path) as file:
         d = json.load(file)

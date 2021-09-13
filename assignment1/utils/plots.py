@@ -14,6 +14,7 @@ from sklearn.utils._testing import ignore_warnings
 
 from utils.grid_search import GridSearchResults, ModelType
 from utils.models import get_nn, get_svm
+from utils.output_grabber import OutputGrabber
 
 
 def visualize_2d_data(x_data: np.ndarray,
@@ -32,7 +33,7 @@ def visualize_2d_data(x_data: np.ndarray,
     """
 
     fig = go.Figure()
-    fig = _add_scatter(fig, x_data, y_data, scatter_alpha=0.2, scatter_size=7)
+    fig = _add_scatter_dataset2d(fig, x_data, y_data, scatter_alpha=0.2, scatter_size=7)
     fig.update_layout({
         'xaxis_title': 'x1',
         'yaxis_title': 'x2',
@@ -66,8 +67,8 @@ def visualize_2d_decision_boundary(model,
     A meshgrid [0, x1_max] x [0, x2_max] is created.
 
     Args:
-        x_data:
-        y_data:
+        x_data: Dataset2D features
+        y_data: Dataset2D labels
         model: A trained model which implements predict_proba() or predict()
         x1_max: Maximum value of first axis
         x2_max: Maximum value of second axis
@@ -111,7 +112,7 @@ def visualize_2d_decision_boundary(model,
                        'nticks': 10
                    }))
 
-    fig = _add_scatter(fig, x_data, y_data, scatter_alpha=0.5, scatter_size=5)
+    fig = _add_scatter_dataset2d(fig, x_data, y_data, scatter_alpha=0.5, scatter_size=5)
     fig.update_layout({'xaxis_title': 'x1', 'yaxis_title': 'x2'})
 
     if title:
@@ -120,9 +121,26 @@ def visualize_2d_decision_boundary(model,
     return fig
 
 
-def _add_scatter(fig: go.Figure, x_data, y_data, scatter_alpha: float,
-                 scatter_size: int):
+def _add_scatter_dataset2d(fig: go.Figure, x_data, y_data, scatter_alpha: float,
+                           scatter_size: int):
+    """Adds Dataset2D scatter plot
+
+    Args:
+        fig: A Figure object
+        x_data: Dataset2D features
+        y_data: Dataset2D labels
+        scatter_alpha: Transparency
+        scatter_size: Scatter size
+
+    Returns:
+        A Figure object with scatter
+
+    """
     positive_indices = y_data == 1
+
+    # Sanity check
+    assert np.all(y_data[np.logical_not(positive_indices)] == 0)
+
     x_positive = x_data[positive_indices]
     x_negative = x_data[np.logical_not(positive_indices)]
 
@@ -153,6 +171,11 @@ def training_size_curve(model: ModelType, x_train: np.ndarray,
                         n_jobs) -> go.Figure:
     """Produces a training curve with respect to training size
 
+    This function is responsible for:
+      - Training the given `model` with all training sizes
+        in the `sizes` parameter.
+      - Generates the corresponding training size curve
+
     Args:
         model: An untrained model
         x_train: Training set features (n_train, n_features)
@@ -165,6 +188,7 @@ def training_size_curve(model: ModelType, x_train: np.ndarray,
         n_jobs: Number of jobs
 
     Returns:
+        A Figure object
 
     """
 
@@ -210,6 +234,28 @@ def training_size_curve_nn(params: dict, x_train: np.ndarray,
                            y_train: np.ndarray, x_val: np.ndarray,
                            y_val: np.ndarray, sizes: List[float],
                            title: str) -> go.Figure:
+    """Plots a neural network training curve
+
+    The figure has the following properties:
+      - x-axis is training sizes
+      - y-axis is accuracy
+      - Training and validation sets are plotted in the same
+        figure.
+
+    Args:
+        params: Parameters to instantiate and `fit()` the
+            neural network i.e. NeuralNetworkEstimator
+        x_train: Training features
+        y_train: Training labels
+        x_val: Validation features
+        y_val: Validation labels
+        sizes: Training sizes
+        title: Plot title
+
+    Returns:
+        A Figure object
+
+    """
 
     if len(x_train) != len(y_train):
         raise ValueError
@@ -403,8 +449,17 @@ def svm_training_curve_iteration(best_params: dict, x_train: np.ndarray,
 
     last_model: Optional[SVC] = None
     params['verbose'] = True
-    model = get_svm(**params)
-    model.fit(x_train, y_train)
+    out = OutputGrabber()
+    with out:
+        model = get_svm(**params)
+        model.fit(x_train, y_train)
+
+    # Capture the max_iter from all SVMs
+    s: str = out.capturedtext
+    split: List[str] = [s_ for s_ in s.split('\n') if '#iter = ' in s_]
+    all_iters = [int(s_.split()[-1]) for s_ in split]
+    max_iter = np.max(all_iters)
+    interval = max(1, max_iter // 100)
 
     params['verbose'] = False
 
@@ -414,7 +469,7 @@ def svm_training_curve_iteration(best_params: dict, x_train: np.ndarray,
     iter_ = 0
 
     while True:
-        iter_ += 10
+        iter_ += interval
 
         logging.info(f'SVM training curve iteration {iter_}')
 
@@ -507,13 +562,12 @@ def gs_results_validation_curve(gs: GridSearchResults, param_name: str,
     return fig
 
 
-def model_confusion_matrix(y_pred: np.ndarray, y_test: np.ndarray,
-                           labels: List[str], plot_title: str):
+def model_confusion_matrix(cm, labels: List[str], plot_title: str):
     """Generates a model confusion matrix
 
     Args:
-        y_pred: Predicted labels
-        y_test: Test set labels
+        cm: Confusion matrix. `cm[i, j]` corresponds to
+            ground truth `i` and predicted `j`.
         labels: Ordered label strings
         plot_title: Plot title string
 
@@ -524,7 +578,6 @@ def model_confusion_matrix(y_pred: np.ndarray, y_test: np.ndarray,
 
     # Code inspired from
     # https://stackoverflow.com/questions/60860121/plotly-how-to-make-an-annotated-confusion-matrix-using-a-heatmap
-    cm: np.ndarray = confusion_matrix(y_test, y_pred)
     z_text = [[str(y) for y in x] for x in cm]
     fig = ff.create_annotated_heatmap(cm, labels, labels,
                                       annotation_text=z_text,

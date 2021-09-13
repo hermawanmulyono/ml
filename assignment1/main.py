@@ -19,15 +19,18 @@ $ python3 main.py --svm --nn
 import argparse
 import logging
 import multiprocessing
+import os
 
 import numpy as np
 import torch.random
 from sklearn.model_selection import train_test_split
 
 from utils.data import gen_2d_data, get_fashion_mnist
-from utils.plots import visualize_2d_data
+from utils.plots import visualize_2d_data, visualize_2d_decision_boundary
 from utils.tasks import dt_task, knn_task, svm_poly_task, svm_rbf_task, \
-    boosting_task, neural_network_task, OUTPUT_DIRECTORY
+    boosting_task, neural_network_task
+from utils.output_files import OUTPUT_DIRECTORY, dataset2d_fig_path, \
+    decision_boundary_fig_path
 
 
 def dataset1(train_dt: bool, train_boosting: bool, train_svm: bool,
@@ -44,62 +47,42 @@ def dataset1(train_dt: bool, train_boosting: bool, train_svm: bool,
 
     train_sizes = [0.2, 0.4, 0.6, 0.8, 1.0]
 
-    dataset2d_file_path = f'{OUTPUT_DIRECTORY}/Dataset2D.png'
-    visualize_2d_data(x_train, y_train,
-                      '2D Data').write_image(dataset2d_file_path)
+    dataset_labels = ['negative', 'positive']
+    dataset_name = 'Dataset2D'
 
-    exit()
+    # Generate dataset visualization
+    dataset2d_fig = visualize_2d_data(x_train, y_train, dataset_name)
+    dataset2d_fig.write_image(dataset2d_fig_path())
 
-    dt_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-            'Dataset2D', dataset_labels, n_jobs, train_dt)
+    dt = dt_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
+                 dataset_name, dataset_labels, n_jobs, train_dt)
+    knn = knn_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
+                   dataset_name, dataset_labels, n_jobs, train_knn)
+    svm_poly = svm_poly_task(x_train, y_train, x_val, y_val, x_test, y_test,
+                             train_sizes, dataset_name, dataset_labels, n_jobs,
+                             train_svm)
+    svm_rbf = svm_rbf_task(x_train, y_train, x_val, y_val, x_test, y_test,
+                           train_sizes, dataset_name, dataset_labels, n_jobs,
+                           train_svm)
+    boosting = boosting_task(x_train, y_train, x_val, y_val, x_test, y_test,
+                             train_sizes, dataset_name, dataset_labels, n_jobs,
+                             train_boosting)
+    nn = neural_network_task(x_train, y_train, x_val, y_val, x_test, y_test,
+                             train_sizes, dataset_name, dataset_labels, n_jobs,
+                             train_nn)
 
-    # dt.fit(x_train, y_train)
+    # Plot decision boundary figures
+    models = [dt, knn, svm_poly, svm_rbf, boosting, nn]
+    model_names = ['DT', 'KNN', 'SVM-Polynomial', 'SVM-RBF', 'Boosting', 'NN']
 
-    # visualize_2d_decision_boundary(dt, x1_max, x2_max, x_train, y_train,
-    #                                'Decision tree').show()
+    for model, model_name in zip(models, model_names):
+        fig_path = decision_boundary_fig_path(model_name, dataset_name)
+        if not os.path.exists(fig_path):
+            plot_title = f'{model_name} {dataset_name} Decision Boundary'
 
-    # adaboost = get_boosting(200, 0.002)
-    # adaboost.fit(x_train, y_train)
-    #
-    # visualize_2d_decision_boundary(adaboost, x1_max, x2_max, x_train, y_train,
-    #                                'Adaboost').show()
-
-    # svm_linear = get_svm('linear')
-    # svm_linear.fit(x_train, y_train)
-    # visualize_2d_decision_boundary(svm_linear, x1_max, x2_max, x_train, y_train,
-    #                                'SVM-Linear').show()
-    #
-    # svm_linear = get_svm('rbf', gamma=0.5)
-    # svm_linear.fit(x_train, y_train)
-    # visualize_2d_decision_boundary(svm_linear, x1_max, x2_max, x_train, y_train,
-    #                                'SVM-Linear').show()
-
-    # knn = get_knn(50)
-    # knn.fit(x_train, y_train)
-    #
-    # fig = visualize_2d_decision_boundary(knn, x1_max, x2_max, x_train, y_train,
-    #                                      'knn')
-    # fig.show()
-
-    # nn = get_nn(in_features=2,
-    #             num_classes=2,
-    #             hidden_layers=[8, 16, 16, 8])
-    #
-    # path_to_state_dict = 'nn.pt'
-    # if os.path.exists(path_to_state_dict):
-    #     nn.load(path_to_state_dict)
-    # else:
-    #     nn.fit(x_train, y_train, x_test, y_test, learning_rate=5e-4,
-    #            batch_size=1024, epochs=1000, verbose=True)
-    #     nn.save(path_to_state_dict)
-    #
-    # loss_fig, acc_fig = training_curves(nn.training_log)
-    # loss_fig.show()
-    # acc_fig.show()
-    #
-    # fig = visualize_2d_decision_boundary(nn, x1_max, x2_max, x_train, y_train,
-    #                                      'Neural network')
-    # fig.show()
+            fig = visualize_2d_decision_boundary(model, x1_size, x2_size,
+                                                 x_train, y_train, plot_title)
+            fig.write_image(fig_path)
 
 
 def dataset2(train_dt: bool, train_boosting: bool, train_svm: bool,
@@ -111,7 +94,11 @@ def dataset2(train_dt: bool, train_boosting: bool, train_svm: bool,
                                                       mnist_y_train,
                                                       test_size=0.2)
 
-    dataset_labels = [f'{i}' for i in range(10)]
+    dataset_labels = [
+        'T-shirt/top', 'Trousers', 'Pullover', 'Dress', 'Coat', 'Sandal',
+        'Shirt', 'Sneaker', 'Bag', 'Ankle boot'
+    ]
+    dataset_name = 'Fashion-MNIST'
 
     assert len(x_train) == len(y_train)
     assert len(x_val) == len(y_val)
@@ -120,17 +107,17 @@ def dataset2(train_dt: bool, train_boosting: bool, train_svm: bool,
     train_sizes = [0.2, 0.4, 0.6, 0.8, 1.0]
 
     dt_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-            'Fashion-MNIST', dataset_labels, n_jobs, train_dt)
+            dataset_name, dataset_labels, n_jobs, train_dt)
     knn_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-             'Fashion-MNIST', dataset_labels, n_jobs, train_knn)
+             dataset_name, dataset_labels, n_jobs, train_knn)
     svm_poly_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                  'Fashion-MNIST', dataset_labels, n_jobs, train_svm)
+                  dataset_name, dataset_labels, n_jobs, train_svm)
     svm_rbf_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                 'Fashion-MNIST', dataset_labels, n_jobs, train_svm)
+                 dataset_name, dataset_labels, n_jobs, train_svm)
     boosting_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                  'Fashion-MNIST', dataset_labels, n_jobs, train_boosting)
+                  dataset_name, dataset_labels, n_jobs, train_boosting)
     neural_network_task(x_train, y_train, x_val, y_val, x_test, y_test,
-                        train_sizes, 'Fashion-MNIST', dataset_labels, n_jobs,
+                        train_sizes, dataset_name, dataset_labels, n_jobs,
                         train_nn)
 
 
@@ -183,5 +170,5 @@ if __name__ == '__main__':
     kwargs = parse_args()
 
     logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler()])
-    # dataset1(**kwargs)
+    dataset1(**kwargs)
     dataset2(**kwargs)
