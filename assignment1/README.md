@@ -9,3 +9,4 @@ TODO:
 6. NN stopping criteria CV vs no 1% improvement after 5 epochs
 7. Repeatability i.e. seed
 8. Boosting validation curve
+9. NN validation curves

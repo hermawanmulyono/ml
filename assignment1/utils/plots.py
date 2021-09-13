@@ -33,7 +33,11 @@ def visualize_2d_data(x_data: np.ndarray,
     """
 
     fig = go.Figure()
-    fig = _add_scatter_dataset2d(fig, x_data, y_data, scatter_alpha=0.2, scatter_size=7)
+    fig = _add_scatter_dataset2d(fig,
+                                 x_data,
+                                 y_data,
+                                 scatter_alpha=0.2,
+                                 scatter_size=7)
     fig.update_layout({
         'xaxis_title': 'x1',
         'yaxis_title': 'x2',
@@ -80,12 +84,18 @@ def visualize_2d_decision_boundary(model,
 
     # Implementation inspired by scikit-learn example
     # https://scikit-learn.org/stable/auto_examples/classification/plot_classifier_comparison.html
-    step = min(x1_max / 100, x2_max / 100)
 
-    x1 = np.arange(0, x1_max, step)
-    x2 = np.arange(0, x2_max, step)
-    xx1, xx2 = np.meshgrid(np.arange(0, x1_max, step),
-                           np.arange(0, x2_max, step))
+    x1_max = np.maximum(np.max(x_data[:, 0]), x1_max)
+    x2_max = np.maximum(np.max(x_data[:, 1]), x2_max)
+
+    x1_min = np.minimum(np.min(x_data[:, 0]), 0)
+    x2_min = np.minimum(np.min(x_data[:, 1]), 0)
+
+    step = min((x1_max - x1_min) / 100, (x2_max - x2_min) / 100)
+
+    x1 = np.arange(x1_min, x1_max, step)
+    x2 = np.arange(x2_min, x2_max, step)
+    xx1, xx2 = np.meshgrid(x1, x2)
 
     x_grid = np.stack([xx1.flatten(), xx2.flatten()], axis=-1)
 
@@ -112,11 +122,20 @@ def visualize_2d_decision_boundary(model,
                        'nticks': 10
                    }))
 
-    fig = _add_scatter_dataset2d(fig, x_data, y_data, scatter_alpha=0.5, scatter_size=5)
+    fig = _add_scatter_dataset2d(fig,
+                                 x_data,
+                                 y_data,
+                                 scatter_alpha=0.5,
+                                 scatter_size=5)
     fig.update_layout({'xaxis_title': 'x1', 'yaxis_title': 'x2'})
 
     if title:
         fig.update_layout({'title': title})
+
+    fig.update_layout({
+        'width': 960,
+        'height': 540,
+    })
 
     return fig
 
@@ -558,7 +577,11 @@ def gs_results_validation_curve(gs: GridSearchResults, param_name: str,
                    mode='lines',
                    name='train'))
 
-    fig.update_layout({'xaxis_title': param_name, 'yaxis_title': 'Accuracy'})
+    fig.update_layout({
+        'xaxis_title': param_name,
+        'yaxis_title': 'Accuracy',
+        'title': plot_title
+    })
     return fig
 
 
@@ -579,7 +602,9 @@ def model_confusion_matrix(cm, labels: List[str], plot_title: str):
     # Code inspired from
     # https://stackoverflow.com/questions/60860121/plotly-how-to-make-an-annotated-confusion-matrix-using-a-heatmap
     z_text = [[str(y) for y in x] for x in cm]
-    fig = ff.create_annotated_heatmap(cm, labels, labels,
+    fig = ff.create_annotated_heatmap(cm,
+                                      labels,
+                                      labels,
                                       annotation_text=z_text,
                                       colorscale='blues',
                                       reversescale=True)

@@ -55,13 +55,12 @@ def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     ccp_alphas: List[float] = np.logspace(0, -5, num=10).tolist()
     param_grid = {'ccp_alpha': ccp_alphas}
     param_name = 'ccp_alpha'
-    param_range = ccp_alphas
     dataset_name = dataset_name
     model_name = 'DT'
 
     model = _train_task(constructor_fn, default_params, param_grid, x_train,
                         y_train, x_val, y_val, train_sizes, param_name,
-                        param_range, dataset_name, model_name, n_jobs, retrain)
+                        dataset_name, model_name, n_jobs, retrain)
 
     _test_task(model, x_test, y_test, model_name, dataset_name, dataset_labels)
 
@@ -76,13 +75,12 @@ def knn_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     k_values = [2**p + 1 for p in range(6)]
     param_grid = {'n_neighbors': k_values}
     param_name = 'n_neighbors'
-    param_range = k_values
     dataset_name = dataset_name
     model_name = 'KNN'
 
     model = _train_task(constructor_fn, default_params, param_grid, x_train,
                         y_train, x_val, y_val, train_sizes, param_name,
-                        param_range, dataset_name, model_name, n_jobs, retrain)
+                        dataset_name, model_name, n_jobs, retrain)
 
     _test_task(model, x_test, y_test, model_name, dataset_name, dataset_labels)
 
@@ -98,14 +96,13 @@ def svm_poly_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     degree_values = [1, 2, 3, 4, 5]
     param_grid = {'C': [0.1, 1.0, 10.0], 'degree': [1, 2, 3, 4, 5]}
     param_name = 'degree'
-    param_range = degree_values
     dataset_name = dataset_name
     model_name = 'SVM-Polynomial'
 
     model: SVC = _train_task(constructor_fn, default_params, param_grid,
                              x_train, y_train, x_val, y_val, train_sizes,
-                             param_name, param_range, dataset_name, model_name,
-                             n_jobs, retrain)
+                             param_name, dataset_name, model_name, n_jobs,
+                             retrain)
 
     best_params = _gs_load(model_name, dataset_name)['best_kwargs']
 
@@ -136,14 +133,13 @@ def svm_rbf_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     gamma_values: List[float] = gamma_values_np.tolist()
     param_grid = {'C': [0.1, 1.0, 10.0, 100], 'gamma': gamma_values}
     param_name = 'gamma'
-    param_range = gamma_values
     dataset_name = dataset_name
     model_name = 'SVM-RBF'
 
     model: SVC = _train_task(constructor_fn, default_params, param_grid,
                              x_train, y_train, x_val, y_val, train_sizes,
-                             param_name, param_range, dataset_name, model_name,
-                             n_jobs, retrain)
+                             param_name, dataset_name, model_name, n_jobs,
+                             retrain)
 
     best_params = _gs_load(model_name, dataset_name)['best_kwargs']
 
@@ -169,15 +165,14 @@ def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     default_params = {'n_estimators': 256, 'ccp_alpha': 0.001}
     param_grid = {'n_estimators': [256]}
     param_name = 'n_estimators'
-    param_range = [256]
     dataset_name = dataset_name
     model_name = 'Boosting'
 
     model: AdaBoostClassifier = _train_task(constructor_fn, default_params,
                                             param_grid, x_train, y_train, x_val,
                                             y_val, train_sizes, param_name,
-                                            param_range, dataset_name,
-                                            model_name, n_jobs, retrain)
+                                            dataset_name, model_name, n_jobs,
+                                            retrain)
 
     # Plot validation curve, which is some sort of iteration curve
     train_scores = [s for s in model.staged_score(x_train, y_train)]
@@ -228,13 +223,14 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
             'hidden_layers': [24] * 4,
             'learning_rate': 1e-5,
             'batch_size': 128,
-            'epochs': 100,
+            'epochs': 200,
             'verbose': True
         }
 
         param_grid = {
             'hidden_layers': [[16] * n for n in [2, 4, 6, 8, 10, 12, 14, 16]],
-            'learning_rate': [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4]
+            'learning_rate': [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3],
+            'batch_size': [32, 64, 128, 256, 512]
         }
         gs = grid_search_nn(default_params, param_grid, x_train, y_train, x_val,
                             y_val)
@@ -286,14 +282,11 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
     return nn_model
 
 
-def _train_task(constructor_fn: Callable[...,
-                                         ModelType], default_params: Dict[str,
-                                                                          Any],
-                param_grid: Dict[str,
-                                 Any], x_train: np.ndarray, y_train: np.ndarray,
-                x_val: np.ndarray, y_val: np.ndarray, train_sizes: List[float],
-                param_name: str, param_range: Iterable, dataset_name: str,
-                model_name: str, n_jobs: int, retrain: bool):
+def _train_task(constructor_fn: Callable[..., ModelType],
+                default_params: Dict[str, Any], param_grid: Dict[str, Any],
+                x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
+                y_val: np.ndarray, train_sizes: List[float], param_name: str,
+                dataset_name: str, model_name: str, n_jobs: int, retrain: bool):
     """Template function for the training tasks for different models
 
     Args:
@@ -308,7 +301,6 @@ def _train_task(constructor_fn: Callable[...,
         y_val: Validation set labels
         train_sizes: List of fractions of training sizes
         param_name: Parameter name to plot on complexity curve
-        param_range: Parameter values to plot on complexity curve
         dataset_name: Dataset name for plot titles and logging purposes
         model_name: Model name for plot titles and logging purposes
         n_jobs: Number of jobs
@@ -357,7 +349,7 @@ def _train_task(constructor_fn: Callable[...,
     # Validation curve
     logging.info(f'{dataset_name} - {model_name} - Validation curve')
 
-    fig_path = validation_fig_path(model_name, dataset_name, 'learning_rate')
+    fig_path = validation_fig_path(model_name, dataset_name, param_name)
     gs = GridSearchResults(**_gs_load(model_name, dataset_name),
                            best_model=model)
     if not os.path.exists(fig_path):
