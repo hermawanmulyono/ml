@@ -46,8 +46,9 @@ def get_knn(n_neighbors: int) -> KNeighborsClassifier:
 
 
 def get_nn(in_features: int, num_classes: int,
-           hidden_layers: List[int]) -> NeuralNetworkEstimator:
+           layer_width: int, num_layers: int) -> NeuralNetworkEstimator:
 
+    hidden_layers = [layer_width] * num_layers
     nn_est = NeuralNetworkEstimator(in_features, num_classes, hidden_layers)
 
     return nn_est

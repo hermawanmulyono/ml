@@ -64,11 +64,12 @@ def grid_search(constructor_fn: Callable[..., ModelType], default_params: dict,
 def grid_search_nn(default_params: dict, param_grid: dict, x_train: np.ndarray,
                    y_train: np.ndarray, x_val: np.ndarray, y_val: np.ndarray):
 
-    def fit_fn(in_features, num_classes, hidden_layers, learning_rate,
+    def fit_fn(in_features, num_classes, layer_width, num_layers, learning_rate,
                batch_size, epochs, verbose):
         nn_ = get_nn(in_features=in_features,
                      num_classes=num_classes,
-                     hidden_layers=hidden_layers)
+                     layer_width=layer_width,
+                     num_layers=num_layers)
         start = time.time()
         nn_.fit(x_train,
                 y_train,

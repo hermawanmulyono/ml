@@ -1,4 +1,4 @@
-from typing import List, Callable, Dict, Any, Iterable
+from typing import List, Callable, Dict, Any
 import json
 import logging
 import os
@@ -220,7 +220,8 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
         default_params = {
             'in_features': in_features,
             'num_classes': 10,
-            'hidden_layers': [24] * 4,
+            'layer_width': 16,
+            'num_layers': 4,
             'learning_rate': 1e-5,
             'batch_size': 128,
             'epochs': 200,
@@ -228,8 +229,9 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
         }
 
         param_grid = {
-            'hidden_layers': [[16] * n for n in [2, 4, 6, 8, 10, 12, 14, 16]],
-            'learning_rate': [3e-7, 1e-6, 3e-6, 1e-5, 3e-5, 1e-4, 3e-4, 1e-3],
+            'layer_width': [8, 16, 24],
+            'num_layers': [3, 5, 7, 9],
+            'learning_rate': [1e-6, 1e-5, 1e-4, 1e-3],
             'batch_size': [32, 64, 128, 256, 512]
         }
         gs = grid_search_nn(default_params, param_grid, x_train, y_train, x_val,
@@ -263,7 +265,8 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
     if not os.path.exists(fig_path):
         plot_title = f'{model_name} {dataset_name} Validation Curve'
         fig_learning_rate = gs_results_validation_curve(gs, 'learning_rate',
-                                                        plot_title)
+                                                        plot_title,
+                                                        log_scale=True)
         fig_learning_rate.write_image(fig_path)
 
     # Training curves

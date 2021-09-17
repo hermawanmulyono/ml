@@ -10,3 +10,5 @@ TODO:
 7. Repeatability i.e. seed
 8. Boosting validation curve
 9. NN validation curves
+10. KNN running time i.e. prediction time
+11. 

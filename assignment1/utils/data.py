@@ -50,31 +50,18 @@ def gen_2d_data(x1_size: float, x2_size: float, num_examples: int,
 
     with temp_seed(1234):
         mean_ = np.array([x1_size / 2, x2_size / 2])
-        std1 = (x1_size / 2)
-        std2 = (x2_size / 2)
-        corr = 0.8 * std1 * std2
+        std1 = (x1_size / 3.5)
+        std2 = (x2_size / 3.5)
+        corr = 0.4 * std1 * std2
         cov_ = np.array([[std1**2, corr], [corr, std2**2]])
 
         x_data = np.random.multivariate_normal(mean_, cov_, size=num_examples)
         # x_data = np.random.rand(num_examples, 2) * np.array([[x1_size, x2_size]])
 
-        x1 = x_data[:, 0]
-        x2 = x_data[:, 1]
-
         # Construct labels
         y_data = np.zeros((num_examples,))
 
-        # Conditions for positive labels
-        cond1 = x1 / (x1_size / 2) + x2 / x2_size - 1
-        cond2 = np.square(
-            (x1 - x1_size) / (x1_size / 2)) + np.square(x2 / (x2_size / 2)) - 1
-        cond3 = np.max(np.stack(
-            [x1_size * 0.3 - x1, x2_size * 0.5 - x2, x1 - 0.75 * x1_size,
-             x2 - 0.9 * x2_size], axis=-1) * 2,
-                       axis=-1)
-
-        cond = np.minimum(np.minimum(cond1, cond2), cond3)
-        prob = 1 / (1 + np.exp(cond / 0.1))
+        prob = _ground_truth_proba(x_data, x1_size, x2_size)
         rand = np.random.uniform(low=0.1, high=1.0, size=(num_examples,))
         y_data[rand <= prob] = 1
 
@@ -86,6 +73,55 @@ def gen_2d_data(x1_size: float, x2_size: float, num_examples: int,
         y_data = y_data.astype(np.int)
 
     return x_data, y_data
+
+
+def _ground_truth_proba(x_data: np.ndarray, x1_size: float, x2_size: float):
+    """Generates Dataset2D ground truth logits
+
+    Args:
+        x_data: Features
+        x1_size: Size of x1 parameter
+        x2_size: Size of x2 parameter
+
+    Returns:
+        Logits of `x_data`. They can be converted to
+            qprobabilities or labels.
+
+    """
+    x1 = x_data[:, 0]
+    x2 = x_data[:, 1]
+
+    # Conditions for positive labels
+    cond1 = x1 / (x1_size / 2) + x2 / x2_size - 1
+    cond2 = np.square(
+        (x1 - x1_size) / (x1_size / 2)) + np.square(x2 / (x2_size / 2)) - 1
+    cond3 = np.max(np.stack([
+        x1_size * 0.3 - x1, x2_size * 0.5 - x2, x1 - 0.75 * x1_size,
+        x2 - 0.9 * x2_size
+    ],
+                            axis=-1) * 2,
+                   axis=-1)
+    logits = np.minimum(np.minimum(cond1, cond2), cond3)
+
+    proba = 1 / (1 + np.exp(logits / 0.1))
+
+    return proba
+
+
+class Dataset2DGroundTruth:
+    def __init__(self, x1_size: float, x2_size: float):
+        self.x1_size = x1_size
+        self.x2_size = x2_size
+
+    def predict_proba(self, x_data: np.ndarray):
+        p = _ground_truth_proba(x_data, self.x1_size, self.x2_size)
+        proba = np.stack([1 - p, p], axis=-1)
+        return proba
+
+    def predict(self, x_data: np.ndarray):
+        proba = self.predict_proba(x_data)
+        labels = (proba[:, 1] > 0.5).astype(float)
+        return labels
 
 
 def get_fashion_mnist(train: bool):
@@ -105,7 +141,9 @@ def get_fashion_mnist(train: bool):
     with temp_seed(1234):
         dir_name = 'mnist'
         os.makedirs(dir_name, exist_ok=True)
-        mnist = torchvision.datasets.FashionMNIST(dir_name, train, download=True)
+        mnist = torchvision.datasets.FashionMNIST(dir_name,
+                                                  train,
+                                                  download=True)
         x = np.stack([np.array(x).flatten().copy() for x, _ in mnist])
         y = np.array([y for _, y in mnist])
 

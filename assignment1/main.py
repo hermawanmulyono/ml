@@ -25,7 +25,7 @@ import numpy as np
 import torch.random
 from sklearn.model_selection import train_test_split
 
-from utils.data import gen_2d_data, get_fashion_mnist
+from utils.data import gen_2d_data, get_fashion_mnist, Dataset2DGroundTruth
 from utils.plots import visualize_2d_data, visualize_2d_decision_boundary
 from utils.tasks import dt_task, knn_task, svm_poly_task, svm_rbf_task, \
     boosting_task, neural_network_task
@@ -51,7 +51,7 @@ def dataset1(train_dt: bool, train_boosting: bool, train_svm: bool,
     dataset_name = 'Dataset2D'
 
     # Generate dataset visualization
-    dataset2d_fig = visualize_2d_data(x_train, y_train, dataset_name)
+    dataset2d_fig = visualize_2d_data(x_train, y_train, f'Train {dataset_name}')
     dataset2d_fig.write_image(dataset2d_fig_path())
 
     dt = dt_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
@@ -83,6 +83,17 @@ def dataset1(train_dt: bool, train_boosting: bool, train_svm: bool,
             fig = visualize_2d_decision_boundary(model, x1_size, x2_size,
                                                  x_train, y_train, plot_title)
             fig.write_image(fig_path)
+
+    # Plot Dataset2D ground truth decision boundary
+    fig_path = decision_boundary_fig_path('Dataset2D-Ground-Truth',
+                                          dataset_name)
+    if not os.path.exists(fig_path):
+        plot_title = f'{dataset_name}'
+        gt_model = Dataset2DGroundTruth(x1_size, x2_size)
+        fig = visualize_2d_decision_boundary(gt_model, x1_size, x2_size,
+                                             x_train, y_train, plot_title,
+                                             scatter_size=5)
+        fig.write_image(fig_path)
 
 
 def dataset2(train_dt: bool, train_boosting: bool, train_svm: bool,

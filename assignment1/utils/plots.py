@@ -45,25 +45,15 @@ def visualize_2d_data(x_data: np.ndarray,
         'height': 540
     })
 
-    fig.update_layout(legend={
-        'yanchor': 'top',
-        'y': 0.99,
-        'xanchor': 'left',
-        'x': 0.01
-    })
-
     if title is not None:
         fig.update_layout({'title': title})
 
     return fig
 
 
-def visualize_2d_decision_boundary(model,
-                                   x1_max: float,
-                                   x2_max: float,
-                                   x_data,
-                                   y_data,
-                                   title: str = None) -> go.Figure:
+def visualize_2d_decision_boundary(model, x1_max: float, x2_max: float, x_data,
+                                   y_data, title: str = None,
+                                   scatter_size=2) -> go.Figure:
     """Visualizes the decision boundary of a trained model
 
     This function only works with model trained with 2D data.
@@ -77,6 +67,7 @@ def visualize_2d_decision_boundary(model,
         x1_max: Maximum value of first axis
         x2_max: Maximum value of second axis
         title: If given, will add plot title
+        scatter_size: Dataset scatter size
 
     Returns:
         A plotly figure object
@@ -126,7 +117,7 @@ def visualize_2d_decision_boundary(model,
                                  x_data,
                                  y_data,
                                  scatter_alpha=0.5,
-                                 scatter_size=5)
+                                 scatter_size=scatter_size)
     fig.update_layout({'xaxis_title': 'x1', 'yaxis_title': 'x2'})
 
     if title:
@@ -135,6 +126,13 @@ def visualize_2d_decision_boundary(model,
     fig.update_layout({
         'width': 960,
         'height': 540,
+    })
+
+    fig.update_layout(legend={
+        'yanchor': 'top',
+        'y': 0.99,
+        'xanchor': 'left',
+        'x': 0.01
     })
 
     return fig
@@ -304,7 +302,8 @@ def training_size_curve_nn(params: dict, x_train: np.ndarray,
         # Fit a neural network
         nn = get_nn(in_features=params['in_features'],
                     num_classes=params['num_classes'],
-                    hidden_layers=params['hidden_layers'])
+                    layer_width=params['layer_width'],
+                    num_layers=params['num_layers'])
         nn.fit(x_train_sampled,
                y_train_sampled,
                x_val,
@@ -523,7 +522,7 @@ def svm_training_curve_iteration(best_params: dict, x_train: np.ndarray,
 
 
 def gs_results_validation_curve(gs: GridSearchResults, param_name: str,
-                                plot_title):
+                                plot_title, log_scale: bool = True):
     """Generates a validation curve
 
     The GridSearchResults contains a table with information
@@ -536,6 +535,7 @@ def gs_results_validation_curve(gs: GridSearchResults, param_name: str,
         plot_title:
         gs: A GridSearchResults object
         param_name: Parameter name to plot
+        log_scale: If True, use log scale x-axis.
 
     Returns:
         A graph object
@@ -582,6 +582,10 @@ def gs_results_validation_curve(gs: GridSearchResults, param_name: str,
         'yaxis_title': 'Accuracy',
         'title': plot_title
     })
+
+    if log_scale:
+        fig.update_xaxes(type='log')
+
     return fig
 
 
