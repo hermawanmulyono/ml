@@ -51,8 +51,12 @@ def visualize_2d_data(x_data: np.ndarray,
     return fig
 
 
-def visualize_2d_decision_boundary(model, x1_max: float, x2_max: float, x_data,
-                                   y_data, title: str = None,
+def visualize_2d_decision_boundary(model,
+                                   x1_max: float,
+                                   x2_max: float,
+                                   x_data,
+                                   y_data,
+                                   title: str = None,
                                    scatter_size=2) -> go.Figure:
     """Visualizes the decision boundary of a trained model
 
@@ -521,8 +525,10 @@ def svm_training_curve_iteration(best_params: dict, x_train: np.ndarray,
     return fig
 
 
-def gs_results_validation_curve(gs: GridSearchResults, param_name: str,
-                                plot_title, log_scale: bool = True):
+def gs_results_validation_curve(gs: GridSearchResults,
+                                param_name: str,
+                                plot_title,
+                                log_scale: bool = True):
     """Generates a validation curve
 
     The GridSearchResults contains a table with information
@@ -624,3 +630,56 @@ def model_confusion_matrix(cm, labels: List[str], plot_title: str):
     })
 
     return fig
+
+
+def sample_mnist_dataset(x_data: np.ndarray, y_data: np.ndarray,
+                         samples_per_label: int) -> np.ndarray:
+    """Picks some samples of the Fashion-MNIST dataset
+
+    A grid of 10 columns will be made, where each column
+    represents a class. The number of rows is determined
+    by the `samples_per_label` argument.
+
+    Args:
+        x_data: Features
+        y_data: Labels
+        samples_per_label: Number of samples per label
+
+    Returns:
+        A numpy array of shape
+            `(samples_per_label * 28, 10 * 28)`.
+
+    """
+    if len(x_data.shape) != 2:
+        raise ValueError
+
+    if x_data.shape[1] != 28 * 28:
+        raise ValueError
+
+    if len(x_data) != len(y_data):
+        raise ValueError
+
+    labels = list(range(10))
+
+    n_samples = len(x_data)
+
+    columns = []
+    for label in labels:
+        # Sample `samples_per_label`
+        indices = np.random.choice(np.arange(n_samples)[y_data == label],
+                                   samples_per_label,
+                                   replace=False)
+        x_sampled = x_data[indices]
+
+        # Reshape 28 by 28
+        x_reshaped = [np.reshape(x, (28, 28)) for x in x_sampled]
+
+        # Concatenate to make a column
+        x_concat = np.concatenate(x_reshaped, axis=0)
+
+        # Append `columns`
+        columns.append(x_concat)
+
+    x_all = np.concatenate(columns, axis=1)
+
+    return x_all

@@ -22,15 +22,17 @@ import multiprocessing
 import os
 
 import numpy as np
+import skimage.io
 import torch.random
 from sklearn.model_selection import train_test_split
 
 from utils.data import gen_2d_data, get_fashion_mnist, Dataset2DGroundTruth
-from utils.plots import visualize_2d_data, visualize_2d_decision_boundary
+from utils.plots import visualize_2d_data, visualize_2d_decision_boundary, \
+    sample_mnist_dataset
 from utils.tasks import dt_task, knn_task, svm_poly_task, svm_rbf_task, \
     boosting_task, neural_network_task
-from utils.output_files import OUTPUT_DIRECTORY, dataset2d_fig_path, \
-    decision_boundary_fig_path
+from utils.output_files import dataset2d_fig_path, \
+    decision_boundary_fig_path, fashion_mnist_samples_fig_path
 
 
 def dataset1(train_dt: bool, train_boosting: bool, train_svm: bool,
@@ -90,8 +92,12 @@ def dataset1(train_dt: bool, train_boosting: bool, train_svm: bool,
     if not os.path.exists(fig_path):
         plot_title = f'{dataset_name}'
         gt_model = Dataset2DGroundTruth(x1_size, x2_size)
-        fig = visualize_2d_decision_boundary(gt_model, x1_size, x2_size,
-                                             x_train, y_train, plot_title,
+        fig = visualize_2d_decision_boundary(gt_model,
+                                             x1_size,
+                                             x2_size,
+                                             x_train,
+                                             y_train,
+                                             plot_title,
                                              scatter_size=5)
         fig.write_image(fig_path)
 
@@ -110,6 +116,10 @@ def dataset2(train_dt: bool, train_boosting: bool, train_svm: bool,
         'Shirt', 'Sneaker', 'Bag', 'Ankle boot'
     ]
     dataset_name = 'Fashion-MNIST'
+
+    # Get some samples
+    samples = sample_mnist_dataset(x_train, y_train, 10)
+    skimage.io.imsave(fashion_mnist_samples_fig_path(), samples)
 
     assert len(x_train) == len(y_train)
     assert len(x_val) == len(y_val)

@@ -72,3 +72,7 @@ def decision_boundary_fig_path(model_name: str, dataset_name: str):
     """Decision boundary visualization"""
     return f'{OUTPUT_DIRECTORY}/{model_name.lower()}_' \
            f'{dataset_name.lower()}_decision_boundary.png'
+
+
+def fashion_mnist_samples_fig_path():
+    return f'{OUTPUT_DIRECTORY}/Fashion-MNIST_samples.png'
