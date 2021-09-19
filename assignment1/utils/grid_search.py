@@ -44,7 +44,7 @@ ModelType = Union[KNeighborsClassifier, SVC, DecisionTreeClassifier,
 
 def grid_search(constructor_fn: Callable[..., ModelType], default_params: dict,
                 param_grid: dict, x_train: np.ndarray, y_train: np.ndarray,
-                x_val: np.ndarray, y_val: np.ndarray, n_jobs):
+                x_val: np.ndarray, y_val: np.ndarray):
 
     def fit_fn(**kwargs):
         model = constructor_fn(**kwargs)

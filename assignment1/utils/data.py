@@ -3,7 +3,6 @@ import contextlib
 
 import numpy as np
 import torchvision
-from torchvision.transforms import Resize
 
 
 @contextlib.contextmanager
@@ -56,7 +55,6 @@ def gen_2d_data(x1_size: float, x2_size: float, num_examples: int,
         cov_ = np.array([[std1**2, corr], [corr, std2**2]])
 
         x_data = np.random.multivariate_normal(mean_, cov_, size=num_examples)
-        # x_data = np.random.rand(num_examples, 2) * np.array([[x1_size, x2_size]])
 
         # Construct labels
         y_data = np.zeros((num_examples,))
@@ -109,16 +107,55 @@ def _ground_truth_proba(x_data: np.ndarray, x1_size: float, x2_size: float):
 
 
 class Dataset2DGroundTruth:
+    """The Dataset2D ground truth
+
+    The interface follows the Scikit-Learn estimator with
+    the following methods:
+
+      1. `predict_proba()`
+      2. `predict()`
+
+    """
     def __init__(self, x1_size: float, x2_size: float):
+        """Initializes a ground truth object
+
+        Args:
+            x1_size: `x1_size` parameter of the Dataset2D
+            x2_size: `x2_size` parameter of the Dataset2D
+        """
         self.x1_size = x1_size
         self.x2_size = x2_size
 
     def predict_proba(self, x_data: np.ndarray):
+        """Predicts probabilities of the given features
+
+        Args:
+            x_data: A `(num_examples, 2)` Dataset2D feature
+                array
+
+        Returns:
+            A `(num_examples, 2)` numpy array, where the
+                first and second columns correspond to the
+                negative and positive probabilities,
+                respectively. Each row sums up to 1.
+
+        """
         p = _ground_truth_proba(x_data, self.x1_size, self.x2_size)
         proba = np.stack([1 - p, p], axis=-1)
         return proba
 
     def predict(self, x_data: np.ndarray):
+        """Predicts the label of the given features
+
+        Args:
+            x_data: A `(num_examples, 2)` Dataset2D feature
+                array
+
+        Returns:
+            A `(num_examples, )` numpy array whose elements
+            are the predicted labels
+
+        """
         proba = self.predict_proba(x_data)
         labels = (proba[:, 1] > 0.5).astype(float)
         return labels

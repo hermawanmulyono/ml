@@ -134,12 +134,12 @@ def visualize_2d_decision_boundary(model,
         'height': 540,
     })
 
-    fig.update_layout(legend={
-        'yanchor': 'top',
-        'y': 0.99,
-        'xanchor': 'left',
-        'x': 0.01
-    })
+    # fig.update_layout(legend={
+    #     'yanchor': 'top',
+    #     'y': 0.99,
+    #     'xanchor': 'left',
+    #     'x': 0.01
+    # })
 
     return fig
 
@@ -190,8 +190,8 @@ def _add_scatter_dataset2d(fig: go.Figure, x_data, y_data, scatter_alpha: float,
 
 def training_size_curve(model: ModelType, x_train: np.ndarray,
                         y_train: np.ndarray, x_val: np.ndarray,
-                        y_val: np.ndarray, sizes: List[float], title: str,
-                        n_jobs) -> go.Figure:
+                        y_val: np.ndarray, sizes: List[float],
+                        title: str) -> go.Figure:
     """Produces a training curve with respect to training size
 
     This function is responsible for:
@@ -208,7 +208,6 @@ def training_size_curve(model: ModelType, x_train: np.ndarray,
         sizes: List of training sizes as fractions e.g.
             `[0.1, 0.25, 0.5, 0.75, 1.0]`.
         title: Plot title
-        n_jobs: Number of jobs
 
     Returns:
         A Figure object
@@ -242,7 +241,6 @@ def training_size_curve(model: ModelType, x_train: np.ndarray,
                                 y_concat,
                                 train_sizes=sizes,
                                 cv=cv,
-                                n_jobs=n_jobs,
                                 shuffle=True,
                                 return_times=True)
 
@@ -685,10 +683,11 @@ def model_confusion_matrix(cm, labels: List[str], plot_title: str):
     fig.update_layout({
         'xaxis_title': 'predicted',
         'yaxis_title': 'ground truth',
-        'width': 960,
-        'height': 540,
         'title': plot_title
     })
+
+    for i in range(len(fig.layout.annotations)):
+        fig.layout.annotations[i].font.size = 20
 
     return fig
 

@@ -36,16 +36,25 @@ from utils.output_files import dataset2d_fig_path, \
 
 
 def dataset1(train_dt: bool, train_boosting: bool, train_svm: bool,
-             train_knn: bool, train_nn: bool, n_jobs: int):
+             train_knn: bool, train_nn: bool):
     x1_size = 5
     x2_size = 2
     n_train = 5000
     n_val = 500
     n_test = 500
     noise_prob = 0.01
-    x_train, y_train = gen_2d_data(x1_size, x2_size, n_train, noise_prob)
-    x_val, y_val = gen_2d_data(x1_size, x2_size, n_val, noise_prob)
-    x_test, y_test = gen_2d_data(x1_size, x2_size, n_test, noise_prob)
+    x_all, y_all = gen_2d_data(x1_size, x2_size, n_train + n_val + n_test,
+                               noise_prob)
+
+    x_train, x_valtest, y_train, y_valtest = train_test_split(
+        x_all, y_all, train_size=n_train)
+
+    x_val, x_test, y_val, y_test = train_test_split(x_valtest, y_valtest,
+                                                    test_size=n_test)
+
+    assert len(x_train) == len(y_train) == n_train
+    assert len(x_val) == len(y_val) == n_val
+    assert len(x_test) == len(y_test) == n_test
 
     train_sizes = [0.2, 0.4, 0.6, 0.8, 1.0]
 
@@ -57,20 +66,19 @@ def dataset1(train_dt: bool, train_boosting: bool, train_svm: bool,
     dataset2d_fig.write_image(dataset2d_fig_path())
 
     dt = dt_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                 dataset_name, dataset_labels, n_jobs, train_dt)
+                 dataset_name, dataset_labels, train_dt)
     knn = knn_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                   dataset_name, dataset_labels, n_jobs, train_knn)
+                   dataset_name, dataset_labels, train_knn)
     svm_poly = svm_poly_task(x_train, y_train, x_val, y_val, x_test, y_test,
-                             train_sizes, dataset_name, dataset_labels, n_jobs,
+                             train_sizes, dataset_name, dataset_labels,
                              train_svm)
     svm_rbf = svm_rbf_task(x_train, y_train, x_val, y_val, x_test, y_test,
-                           train_sizes, dataset_name, dataset_labels, n_jobs,
-                           train_svm)
+                           train_sizes, dataset_name, dataset_labels, train_svm)
     boosting = boosting_task(x_train, y_train, x_val, y_val, x_test, y_test,
-                             train_sizes, dataset_name, dataset_labels, n_jobs,
+                             train_sizes, dataset_name, dataset_labels,
                              train_boosting)
     nn = neural_network_task(x_train, y_train, x_val, y_val, x_test, y_test,
-                             train_sizes, dataset_name, dataset_labels, n_jobs,
+                             train_sizes, dataset_name, dataset_labels,
                              train_nn)
 
     # Plot decision boundary figures
@@ -103,7 +111,7 @@ def dataset1(train_dt: bool, train_boosting: bool, train_svm: bool,
 
 
 def dataset2(train_dt: bool, train_boosting: bool, train_svm: bool,
-             train_knn: bool, train_nn: bool, n_jobs: int):
+             train_knn: bool, train_nn: bool):
     mnist_x_train, mnist_y_train = get_fashion_mnist(train=True)
     x_test, y_test = get_fashion_mnist(train=False)
 
@@ -128,18 +136,17 @@ def dataset2(train_dt: bool, train_boosting: bool, train_svm: bool,
     train_sizes = [0.2, 0.4, 0.6, 0.8, 1.0]
 
     dt_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-            dataset_name, dataset_labels, n_jobs, train_dt)
+            dataset_name, dataset_labels, train_dt)
     knn_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-             dataset_name, dataset_labels, n_jobs, train_knn)
+             dataset_name, dataset_labels, train_knn)
     svm_poly_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                  dataset_name, dataset_labels, n_jobs, train_svm)
+                  dataset_name, dataset_labels, train_svm)
     svm_rbf_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                 dataset_name, dataset_labels, n_jobs, train_svm)
+                 dataset_name, dataset_labels, train_svm)
     boosting_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                  dataset_name, dataset_labels, n_jobs, train_boosting)
+                  dataset_name, dataset_labels, train_boosting)
     neural_network_task(x_train, y_train, x_val, y_val, x_test, y_test,
-                        train_sizes, dataset_name, dataset_labels, n_jobs,
-                        train_nn)
+                        train_sizes, dataset_name, dataset_labels, train_nn)
 
 
 def parse_args():
@@ -159,27 +166,14 @@ def parse_args():
                             action='store_true',
                             help=f'If given, {model_name} will be retrained.')
 
-    parser.add_argument('-n',
-                        '--num-jobs',
-                        type=int,
-                        default=0,
-                        help='Number of jobs to be deployed. If num-jobs is'
-                        ' 0, all available CPUs will be used.')
-
     args = parser.parse_args()
-
-    if args.num_jobs == 0:
-        num_jobs = multiprocessing.cpu_count()
-    else:
-        num_jobs = args.num_jobs
 
     kwargs = {
         'train_dt': args.dt,
         'train_boosting': args.boosting,
         'train_svm': args.svm,
         'train_knn': args.knn,
-        'train_nn': args.nn,
-        'n_jobs': num_jobs
+        'train_nn': args.nn
     }
 
     return kwargs

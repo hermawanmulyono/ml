@@ -25,7 +25,7 @@ from utils.plots import training_size_curve, training_size_curve_nn, \
 
 def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
             y_val: np.ndarray, x_test, y_test, train_sizes: List[float],
-            dataset_name: str, dataset_labels, n_jobs: int, retrain: bool):
+            dataset_name: str, dataset_labels, retrain: bool):
     """Task for decision tree
 
     The tasks are:
@@ -44,7 +44,6 @@ def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
         y_val: Validation set labels
         train_sizes: List of fractions of training sizes
         dataset_name: Name of the dataset
-        n_jobs: Number of jobs
         retrain: If True, the decision tree will be retrained
 
     Returns:
@@ -60,7 +59,7 @@ def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
     model = _train_task(constructor_fn, default_params, param_grid, x_train,
                         y_train, x_val, y_val, train_sizes, param_name,
-                        dataset_name, model_name, n_jobs, retrain)
+                        dataset_name, model_name, retrain)
 
     _test_task(model, x_test, y_test, model_name, dataset_name, dataset_labels)
 
@@ -69,7 +68,7 @@ def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
 def knn_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
              y_val: np.ndarray, x_test, y_test, train_sizes: List[float],
-             dataset_name: str, dataset_labels, n_jobs: int, retrain: bool):
+             dataset_name: str, dataset_labels, retrain: bool):
     constructor_fn = get_knn
     default_params = {'n_neighbors': 9}
     k_values = [2**p + 1 for p in range(6)]
@@ -80,7 +79,7 @@ def knn_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
     model = _train_task(constructor_fn, default_params, param_grid, x_train,
                         y_train, x_val, y_val, train_sizes, param_name,
-                        dataset_name, model_name, n_jobs, retrain)
+                        dataset_name, model_name, retrain)
 
     _test_task(model, x_test, y_test, model_name, dataset_name, dataset_labels)
 
@@ -89,11 +88,9 @@ def knn_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
 def svm_poly_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
                   y_val: np.ndarray, x_test, y_test, train_sizes: List[float],
-                  dataset_name: str, dataset_labels, n_jobs: int,
-                  retrain: bool):
+                  dataset_name: str, dataset_labels, retrain: bool):
     constructor_fn = get_svm
     default_params = {'kernel': 'poly'}
-    degree_values = [1, 2, 3, 4, 5]
     param_grid = {'C': [0.1, 1.0, 10.0], 'degree': [1, 2, 3, 4, 5]}
     param_name = 'degree'
     dataset_name = dataset_name
@@ -101,8 +98,7 @@ def svm_poly_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
     model: SVC = _train_task(constructor_fn, default_params, param_grid,
                              x_train, y_train, x_val, y_val, train_sizes,
-                             param_name, dataset_name, model_name, n_jobs,
-                             retrain)
+                             param_name, dataset_name, model_name, retrain)
 
     best_params = _gs_load(model_name, dataset_name)['best_kwargs']
 
@@ -122,7 +118,7 @@ def svm_poly_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
 def svm_rbf_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
                  y_val: np.ndarray, x_test, y_test, train_sizes: List[float],
-                 dataset_name: str, dataset_labels, n_jobs: int, retrain: bool):
+                 dataset_name: str, dataset_labels, retrain: bool):
     constructor_fn = get_svm
 
     # Equivalent to "scale" option in scikit-learn
@@ -138,8 +134,7 @@ def svm_rbf_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
     model: SVC = _train_task(constructor_fn, default_params, param_grid,
                              x_train, y_train, x_val, y_val, train_sizes,
-                             param_name, dataset_name, model_name, n_jobs,
-                             retrain)
+                             param_name, dataset_name, model_name, retrain)
 
     best_params = _gs_load(model_name, dataset_name)['best_kwargs']
 
@@ -159,11 +154,10 @@ def svm_rbf_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
 def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
                   y_val: np.ndarray, x_test, y_test, train_sizes: List[float],
-                  dataset_name: str, dataset_labels, n_jobs: int,
-                  retrain: bool):
+                  dataset_name: str, dataset_labels, retrain: bool):
     constructor_fn = get_boosting
     default_params = {'n_estimators': 256, 'ccp_alpha': 0.001}
-    param_grid = {'n_estimators': [256]}
+    param_grid = {'n_estimators': [512], 'max_depth': [2, 4, 8]}
     param_name = 'n_estimators'
     dataset_name = dataset_name
     model_name = 'Boosting'
@@ -171,8 +165,7 @@ def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     model: AdaBoostClassifier = _train_task(constructor_fn, default_params,
                                             param_grid, x_train, y_train, x_val,
                                             y_val, train_sizes, param_name,
-                                            dataset_name, model_name, n_jobs,
-                                            retrain)
+                                            dataset_name, model_name, retrain)
 
     # Plot validation curve, which is some sort of iteration curve
     train_scores = [s for s in model.staged_score(x_train, y_train)]
@@ -208,13 +201,13 @@ def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
                         x_val: np.ndarray, y_val: np.ndarray, x_test, y_test,
                         train_sizes: List[float], dataset_name: str,
-                        dataset_labels, n_jobs: int, retrain: bool):
+                        dataset_labels, retrain: bool):
     in_features = x_train.shape[1]
 
     model_name = 'NN'
 
     path_to_state_dict = model_state_dict_path(model_name, dataset_name)
-    if os.path.exists(path_to_state_dict):
+    if (not retrain) and os.path.exists(path_to_state_dict):
         nn_model = nnestimator.NeuralNetworkEstimator.from_state_dict(
             path_to_state_dict)
     else:
@@ -294,7 +287,7 @@ def _train_task(constructor_fn: Callable[..., ModelType],
                 default_params: Dict[str, Any], param_grid: Dict[str, Any],
                 x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
                 y_val: np.ndarray, train_sizes: List[float], param_name: str,
-                dataset_name: str, model_name: str, n_jobs: int, retrain: bool):
+                dataset_name: str, model_name: str, retrain: bool):
     """Template function for the training tasks for different models
 
     Args:
@@ -311,7 +304,6 @@ def _train_task(constructor_fn: Callable[..., ModelType],
         param_name: Parameter name to plot on complexity curve
         dataset_name: Dataset name for plot titles and logging purposes
         model_name: Model name for plot titles and logging purposes
-        n_jobs: Number of jobs
         retrain: If True, the model will be retrained
 
     Returns:
@@ -325,7 +317,7 @@ def _train_task(constructor_fn: Callable[..., ModelType],
         # Grid search
         logging.info(f'{dataset_name} - {model_name} - Grid search')
         gs = grid_search(constructor_fn, default_params, param_grid, x_train,
-                         y_train, x_val, y_val, n_jobs)
+                         y_train, x_val, y_val)
 
         # Save results into JSON
         _gs_results_to_json(gs, model_name, dataset_name)
@@ -343,14 +335,9 @@ def _train_task(constructor_fn: Callable[..., ModelType],
     fig_path = training_fig_path(model_name, dataset_name)
 
     if not os.path.exists(fig_path):
-        fig = training_size_curve(
-            model,
-            x_train,
-            y_train,
-            x_val,
-            y_val,
-            train_sizes,
-            title=f'{model_name} - {dataset_name} Training Size Curve')
+        fig = training_size_curve(model, x_train, y_train, x_val, y_val,
+                                  train_sizes,
+                                  title=f'{model_name} - {dataset_name} Training Size Curve')
         fig.write_image(fig_path)
 
     # Validation curve

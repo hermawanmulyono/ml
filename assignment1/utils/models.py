@@ -27,11 +27,13 @@ def get_decision_tree(ccp_alpha: float) -> DecisionTreeClassifier:
     return dt
 
 
-def get_boosting(n_estimators: int, ccp_alpha: float) -> AdaBoostClassifier:
+def get_boosting(n_estimators: int,
+                 ccp_alpha: float,
+                 max_depth=10) -> AdaBoostClassifier:
     base_estimator = DecisionTreeClassifier(criterion='entropy',
                                             splitter='best',
                                             ccp_alpha=ccp_alpha,
-                                            max_depth=10)
+                                            max_depth=max_depth)
 
     adaboost = AdaBoostClassifier(base_estimator, n_estimators=n_estimators)
 
@@ -46,8 +48,8 @@ def get_knn(n_neighbors: int) -> KNeighborsClassifier:
     return KNeighborsClassifier(n_neighbors)
 
 
-def get_nn(in_features: int, num_classes: int,
-           layer_width: int, num_layers: int) -> NeuralNetworkEstimator:
+def get_nn(in_features: int, num_classes: int, layer_width: int,
+           num_layers: int) -> NeuralNetworkEstimator:
 
     hidden_layers = [layer_width] * num_layers
     nn_est = NeuralNetworkEstimator(in_features, num_classes, hidden_layers)
