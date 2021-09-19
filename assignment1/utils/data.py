@@ -151,7 +151,7 @@ def get_fashion_mnist(train: bool):
         num_examples = len(x)
 
         # Adjust these lines if need a smaller dataset
-        indices = np.arange(0, num_examples, 20)
+        indices = np.arange(0, num_examples, 10)
         x_resampled = x[indices]
         y_resampled = y[indices]
 

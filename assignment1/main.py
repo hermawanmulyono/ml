@@ -40,8 +40,8 @@ def dataset1(train_dt: bool, train_boosting: bool, train_svm: bool,
     x1_size = 5
     x2_size = 2
     n_train = 5000
-    n_val = 200
-    n_test = 200
+    n_val = 500
+    n_test = 500
     noise_prob = 0.01
     x_train, y_train = gen_2d_data(x1_size, x2_size, n_train, noise_prob)
     x_val, y_val = gen_2d_data(x1_size, x2_size, n_val, noise_prob)

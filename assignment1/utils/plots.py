@@ -1,10 +1,12 @@
 import copy
 import logging
+import time
 from typing import List, Any, Iterable, Optional
 
 import numpy as np
 import plotly.figure_factory as ff
 from plotly import graph_objects as go
+from plotly.subplots import make_subplots
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.model_selection import validation_curve, learning_curve
@@ -235,18 +237,24 @@ def training_size_curve(model: ModelType, x_train: np.ndarray,
 
     cv = [(np.arange(n_train), np.arange(n_train, n_concat))]
 
-    train_sizes_ags, train_accs_, val_accs_ = learning_curve(model,
-                                                             x_concat,
-                                                             y_concat,
-                                                             train_sizes=sizes,
-                                                             cv=cv,
-                                                             n_jobs=n_jobs,
-                                                             shuffle=True)
+    lc_results = learning_curve(model,
+                                x_concat,
+                                y_concat,
+                                train_sizes=sizes,
+                                cv=cv,
+                                n_jobs=n_jobs,
+                                shuffle=True,
+                                return_times=True)
+
+    train_sizes_ags, train_accs_, val_accs_, fit_times, score_times = lc_results
+    fit_times: np.ndarray = fit_times.flatten()
+    score_times: np.ndarray = score_times.flatten()
 
     train_accs = train_accs_.flatten()
     val_accs = val_accs_.flatten()
 
-    fig = _generate_training_size_curve(sizes, train_accs, val_accs, title)
+    fig = _generate_training_size_curves(sizes, train_accs, val_accs, title,
+                                         fit_times, score_times)
 
     return fig
 
@@ -299,6 +307,9 @@ def training_size_curve_nn(params: dict, x_train: np.ndarray,
     train_accs: List[float] = []
     val_accs: List[float] = []
 
+    train_times_: List[float] = []
+    predict_times_: List[float] = []
+
     for length in lengths:
         x_train_sampled = x_train[:length]
         y_train_sampled = y_train[:length]
@@ -308,6 +319,8 @@ def training_size_curve_nn(params: dict, x_train: np.ndarray,
                     num_classes=params['num_classes'],
                     layer_width=params['layer_width'],
                     num_layers=params['num_layers'])
+
+        start = time.time()
         nn.fit(x_train_sampled,
                y_train_sampled,
                x_val,
@@ -316,28 +329,76 @@ def training_size_curve_nn(params: dict, x_train: np.ndarray,
                batch_size=params['batch_size'],
                epochs=params['epochs'],
                verbose=params['verbose'])
+        finish = time.time()
+        train_times_.append(finish - start)
 
         y_pred = nn.predict(x_train_sampled)
         train_accs.append(accuracy_score(y_train_sampled, y_pred))
 
+        start = time.time()
         y_pred = nn.predict(x_val)
         val_accs.append(accuracy_score(y_val, y_pred))
+        finish = time.time()
+        predict_times_.append(finish - start)
 
-    fig = _generate_training_size_curve(sizes, train_accs, val_accs, title)
+    train_times = np.array(train_times_)
+    predict_times = np.array(predict_times_)
+
+    fig = _generate_training_size_curves(sizes, train_accs, val_accs, title,
+                                         train_times, predict_times)
 
     return fig
 
 
-def _generate_training_size_curve(sizes: Iterable[float],
-                                  train_accs: Iterable[float],
-                                  val_accs: Iterable[float], title: str):
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=sizes, y=train_accs, mode='lines', name='train'))
-    fig.add_trace(go.Scatter(x=sizes, y=val_accs, mode='lines', name='val'))
-    fig.update_layout({
-        'xaxis_title': 'Training size',
-        'yaxis_title': 'Accuracy'
-    })
+def _generate_training_size_curves(sizes: Iterable[float],
+                                   train_accs: Iterable[float],
+                                   val_accs: Iterable[float], title: str,
+                                   train_times, predict_times):
+    """Generates training size curves
+
+    There are two curves:
+      1. Accuracy with respect to training sizes
+      2. Training/prediction times with respect to training sizes
+
+    Args:
+        sizes: Fractions of training sizes i.e. x-axis values
+        train_accs: Training accuracy values
+        val_accs: Validation accuracy values
+        title: Plot title
+        train_times: Training times
+        predict_times: Prediction times
+
+    Returns:
+        A Figure object
+
+    """
+    fig = make_subplots(rows=2, cols=1)
+    fig.add_trace(go.Scatter(x=sizes,
+                             y=train_accs,
+                             mode='lines',
+                             name='train_acc'),
+                  row=1,
+                  col=1)
+    fig.add_trace(go.Scatter(x=sizes, y=val_accs, mode='lines', name='val_acc'),
+                  row=1,
+                  col=1)
+
+    fig.add_trace(go.Scatter(x=sizes,
+                             y=train_times,
+                             mode='lines',
+                             name='train_times'),
+                  row=2,
+                  col=1)
+    fig.add_trace(go.Scatter(x=sizes,
+                             y=predict_times,
+                             mode='lines',
+                             name='prediction_times'),
+                  row=2,
+                  col=1)
+
+    fig.update_xaxes(title_text='Training size')
+    fig.update_yaxes(title_text='Accuracy', row=1, col=1)
+    fig.update_yaxes(title_text='Time (s)', row=2, col=1)
 
     fig.update_layout({'title': title})
 

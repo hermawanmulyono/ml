@@ -193,7 +193,8 @@ def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
         'yaxis_title': 'Accuracy'
     })
 
-    fig.update_layout({'title': 'Boosting Validation curve'})
+    fig.update_layout({'title': f'Boosting {dataset_name} Validation curve'})
+    fig.update_xaxes(type='log')
 
     # Overwrite the complexity figure path
     fig_path = validation_fig_path(model_name, dataset_name, param_name)
@@ -229,10 +230,10 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
         }
 
         param_grid = {
-            'layer_width': [8, 16, 24],
-            'num_layers': [3, 5, 7, 9],
-            'learning_rate': [1e-6, 1e-5, 1e-4, 1e-3],
-            'batch_size': [32, 64, 128, 256, 512]
+            'layer_width': [8, 16, 32, 64, 128],
+            'num_layers': [2, 4, 8, 16],
+            'learning_rate': [1e-6, 1e-5, 1e-4, 1e-3, 1e-2],
+            'batch_size': [64, 128, 256, 512]
         }
         gs = grid_search_nn(default_params, param_grid, x_train, y_train, x_val,
                             y_val)
@@ -259,15 +260,19 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
         fig.write_image(fig_path)
 
     # Validation curve
-    fig_path = validation_fig_path(model_name, dataset_name, 'learning_rate')
-    gs = GridSearchResults(**_gs_load(model_name, dataset_name),
-                           best_model=nn_model)
-    if not os.path.exists(fig_path):
-        plot_title = f'{model_name} {dataset_name} Validation Curve'
-        fig_learning_rate = gs_results_validation_curve(gs, 'learning_rate',
-                                                        plot_title,
-                                                        log_scale=True)
-        fig_learning_rate.write_image(fig_path)
+    val_curve_params = ['learning_rate', 'batch_size', 'layer_width',
+                        'num_layers']
+    for param_name in val_curve_params:
+        fig_path = validation_fig_path(model_name, dataset_name, param_name)
+        gs = GridSearchResults(**_gs_load(model_name, dataset_name),
+                               best_model=nn_model)
+        if not os.path.exists(fig_path):
+            plot_title = f'{model_name} {dataset_name} Validation Curve'
+            fig_learning_rate = gs_results_validation_curve(gs,
+                                                            param_name,
+                                                            plot_title,
+                                                            log_scale=True)
+            fig_learning_rate.write_image(fig_path)
 
     # Training curves
     loss_fig, acc_fig = nnestimator.training_curves(nn_model.training_log)
@@ -345,8 +350,7 @@ def _train_task(constructor_fn: Callable[..., ModelType],
             x_val,
             y_val,
             train_sizes,
-            title=f'{model_name} - {dataset_name} Training Size Curve',
-            n_jobs=n_jobs)
+            title=f'{model_name} - {dataset_name} Training Size Curve')
         fig.write_image(fig_path)
 
     # Validation curve
