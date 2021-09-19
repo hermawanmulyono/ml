@@ -16,9 +16,9 @@ $ python3 main.py --svm --nn
 
 """
 
+from typing import NamedTuple
 import argparse
 import logging
-import multiprocessing
 import os
 
 import numpy as np
@@ -35,21 +35,43 @@ from utils.output_files import dataset2d_fig_path, \
     decision_boundary_fig_path, fashion_mnist_samples_fig_path
 
 
-def dataset1(train_dt: bool, train_boosting: bool, train_svm: bool,
-             train_knn: bool, train_nn: bool):
+class TrainFlags(NamedTuple):
+    """A named tuple to contain which model needs to
+    be retrained.
+
+    The flags are:
+      - train_dt: Train decision tree
+      - train_boosting: Train boosting
+      - train_svm: Train SVM
+      - train_knn: Train KNN
+      - train_nn: Train Neural Network
+    """
+    train_dt: bool
+    train_boosting: bool
+    train_svm: bool
+    train_knn: bool
+    train_nn: bool
+
+
+def dataset1(flags: TrainFlags):
     x1_size = 5
     x2_size = 2
     n_train = 5000
     n_val = 500
     n_test = 500
     noise_prob = 0.01
+
+    # gen_2d_data() is a deterministic function, so we cannot call it three
+    # times to produce train, val, and test sets. The correct way to do it
+    # is by producing all samples, then split to train, val, and test.
     x_all, y_all = gen_2d_data(x1_size, x2_size, n_train + n_val + n_test,
                                noise_prob)
 
     x_train, x_valtest, y_train, y_valtest = train_test_split(
         x_all, y_all, train_size=n_train)
 
-    x_val, x_test, y_val, y_test = train_test_split(x_valtest, y_valtest,
+    x_val, x_test, y_val, y_test = train_test_split(x_valtest,
+                                                    y_valtest,
                                                     test_size=n_test)
 
     assert len(x_train) == len(y_train) == n_train
@@ -65,21 +87,9 @@ def dataset1(train_dt: bool, train_boosting: bool, train_svm: bool,
     dataset2d_fig = visualize_2d_data(x_train, y_train, f'Train {dataset_name}')
     dataset2d_fig.write_image(dataset2d_fig_path())
 
-    dt = dt_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                 dataset_name, dataset_labels, train_dt)
-    knn = knn_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                   dataset_name, dataset_labels, train_knn)
-    svm_poly = svm_poly_task(x_train, y_train, x_val, y_val, x_test, y_test,
-                             train_sizes, dataset_name, dataset_labels,
-                             train_svm)
-    svm_rbf = svm_rbf_task(x_train, y_train, x_val, y_val, x_test, y_test,
-                           train_sizes, dataset_name, dataset_labels, train_svm)
-    boosting = boosting_task(x_train, y_train, x_val, y_val, x_test, y_test,
-                             train_sizes, dataset_name, dataset_labels,
-                             train_boosting)
-    nn = neural_network_task(x_train, y_train, x_val, y_val, x_test, y_test,
-                             train_sizes, dataset_name, dataset_labels,
-                             train_nn)
+    dt, knn, svm_poly, svm_rbf, boosting, nn = _run_all_models(
+        x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
+        dataset_name, dataset_labels, flags)
 
     # Plot decision boundary figures
     models = [dt, knn, svm_poly, svm_rbf, boosting, nn]
@@ -110,8 +120,7 @@ def dataset1(train_dt: bool, train_boosting: bool, train_svm: bool,
         fig.write_image(fig_path)
 
 
-def dataset2(train_dt: bool, train_boosting: bool, train_svm: bool,
-             train_knn: bool, train_nn: bool):
+def dataset2(flags: TrainFlags):
     mnist_x_train, mnist_y_train = get_fashion_mnist(train=True)
     x_test, y_test = get_fashion_mnist(train=False)
 
@@ -135,18 +144,32 @@ def dataset2(train_dt: bool, train_boosting: bool, train_svm: bool,
 
     train_sizes = [0.2, 0.4, 0.6, 0.8, 1.0]
 
-    dt_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-            dataset_name, dataset_labels, train_dt)
-    knn_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-             dataset_name, dataset_labels, train_knn)
-    svm_poly_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                  dataset_name, dataset_labels, train_svm)
-    svm_rbf_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                 dataset_name, dataset_labels, train_svm)
-    boosting_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                  dataset_name, dataset_labels, train_boosting)
-    neural_network_task(x_train, y_train, x_val, y_val, x_test, y_test,
-                        train_sizes, dataset_name, dataset_labels, train_nn)
+    _run_all_models(x_train, y_train, x_val, y_val, x_test, y_test,
+                    train_sizes, dataset_name, dataset_labels, flags)
+
+
+def _run_all_models(x_train, y_train, x_val, y_val, x_test, y_test,
+                    train_sizes, dataset_name, dataset_labels,
+                    flags: TrainFlags):
+
+    dt = dt_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
+                 dataset_name, dataset_labels, flags.train_dt)
+    knn = knn_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
+                   dataset_name, dataset_labels, flags.train_knn)
+    svm_poly = svm_poly_task(x_train, y_train, x_val, y_val, x_test, y_test,
+                             train_sizes, dataset_name, dataset_labels,
+                             flags.train_svm)
+    svm_rbf = svm_rbf_task(x_train, y_train, x_val, y_val, x_test, y_test,
+                           train_sizes, dataset_name, dataset_labels,
+                           flags.train_svm)
+    boosting = boosting_task(x_train, y_train, x_val, y_val, x_test, y_test,
+                             train_sizes, dataset_name, dataset_labels,
+                             flags.train_boosting)
+    nn = neural_network_task(x_train, y_train, x_val, y_val, x_test, y_test,
+                             train_sizes, dataset_name, dataset_labels,
+                             flags.train_nn)
+
+    return dt, knn, svm_poly, svm_rbf, boosting, nn
 
 
 def parse_args():
@@ -168,22 +191,20 @@ def parse_args():
 
     args = parser.parse_args()
 
-    kwargs = {
-        'train_dt': args.dt,
-        'train_boosting': args.boosting,
-        'train_svm': args.svm,
-        'train_knn': args.knn,
-        'train_nn': args.nn
-    }
+    flags = TrainFlags(train_dt=args.dt,
+                       train_boosting=args.boosting,
+                       train_svm=args.svm,
+                       train_knn=args.knn,
+                       train_nn=args.nn)
 
-    return kwargs
+    return flags
 
 
 if __name__ == '__main__':
     np.random.seed(1234)
     torch.manual_seed(1234)
-    kwargs = parse_args()
+    train_flags = parse_args()
 
     logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler()])
-    dataset1(**kwargs)
-    dataset2(**kwargs)
+    dataset1(train_flags)
+    dataset2(train_flags)

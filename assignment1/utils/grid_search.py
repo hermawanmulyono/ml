@@ -15,6 +15,28 @@ from utils.nnestimator import NeuralNetworkEstimator
 
 
 class GridSearchResults(NamedTuple):
+    """A structure to store grid search results.
+
+    The members are:
+      - best_accuracy: Best accuracy of the model on the
+        validation set
+      - best_kwargs: Best keyword arguments to construct
+        the model with best accuracy. This contains the
+        best parameters to use.
+      - best_fit_time: The best model training time.
+      - best_model: The best model object
+      - table: A list `[..., (kwargs, results), ...]` where
+        `kwargs` is a set of keyword arguments, `results`
+        is the corresponding results
+
+             {'train_accuracy': ...,
+             'val_accuracy': ...,
+             'fit_time': ...}
+
+        This is the table of all grid search results.
+
+
+    """
     best_accuracy: Optional[float]
     best_kwargs: Optional[dict]
     best_fit_time: Optional[float]

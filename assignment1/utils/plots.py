@@ -640,7 +640,7 @@ def gs_results_validation_curve(gs: GridSearchResults,
         go.Scatter(x=sorted_param_values,
                    y=sorted_val_acc,
                    mode='lines',
-                   name='train'))
+                   name='val'))
 
     fig.update_layout({
         'xaxis_title': param_name,
