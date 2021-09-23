@@ -11,18 +11,20 @@ SklearnModel = Union[KNeighborsClassifier, SVC, DecisionTreeClassifier,
                      AdaBoostClassifier]
 
 
-def get_decision_tree(ccp_alpha: float) -> DecisionTreeClassifier:
+def get_decision_tree(ccp_alpha: float, splitter) -> DecisionTreeClassifier:
     """Constructs a decision tree with pruning
 
     Args:
         ccp_alpha: Pruning minimal cost-complexity parameter alpha
+        splitter: Either 'random' or 'best', indicating the splitting
+            strategy of the decision tree.
 
     Returns:
         A decision tree classifier object
 
     """
     dt = DecisionTreeClassifier(criterion='entropy',
-                                splitter='random',
+                                splitter=splitter,
                                 ccp_alpha=ccp_alpha)
     return dt
 
@@ -44,8 +46,8 @@ def get_svm(kernel: str, **kwargs) -> SVC:
     return SVC(kernel=kernel, **kwargs)
 
 
-def get_knn(n_neighbors: int) -> KNeighborsClassifier:
-    return KNeighborsClassifier(n_neighbors)
+def get_knn(n_neighbors: int, weights: str) -> KNeighborsClassifier:
+    return KNeighborsClassifier(n_neighbors, weights=weights)
 
 
 def get_nn(in_features: int, num_classes: int, layer_width: int,

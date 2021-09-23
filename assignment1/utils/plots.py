@@ -1,7 +1,7 @@
 import copy
 import logging
 import time
-from typing import List, Any, Iterable, Optional
+from typing import List, Any, Iterable, Optional, Union
 
 import numpy as np
 import plotly.figure_factory as ff
@@ -587,7 +587,8 @@ def svm_training_curve_iteration(best_params: dict, x_train: np.ndarray,
 def gs_results_validation_curve(gs: GridSearchResults,
                                 param_name: str,
                                 plot_title,
-                                log_scale: bool = True):
+                                log_scale: bool = True,
+                                other_params: Union[str, dict] = 'best'):
     """Generates a validation curve
 
     The GridSearchResults contains a table with information
@@ -601,15 +602,21 @@ def gs_results_validation_curve(gs: GridSearchResults,
         gs: A GridSearchResults object
         param_name: Parameter name to plot
         log_scale: If True, use log scale x-axis.
+        other_params: Keyword arguments for parameters
+            other than `param_name`. If 'best' is given,
+            they will be inferred from `gs.best_kwargs`.
 
     Returns:
         A graph object
 
     """
 
-    best_params = gs.best_kwargs
-
-    other_params = {k: v for k, v in best_params.items() if k != param_name}
+    if other_params == 'best':
+        best_params = gs.best_kwargs
+        other_params = {k: v for k, v in best_params.items() if k != param_name}
+    else:
+        if param_name in other_params.keys():
+            raise ValueError
 
     param_values = []
     val_acc = []

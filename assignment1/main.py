@@ -104,6 +104,15 @@ def dataset1(flags: TrainFlags):
                                                  x_train, y_train, plot_title)
             fig.write_image(fig_path)
 
+    fig_path = decision_boundary_fig_path('SVM-Polynomial-Zoomed out',
+                                          dataset_name)
+    if not os.path.exists(fig_path):
+        plot_title = f'SVM-Polynomial-Zoomed out {dataset_name} Decision Boundary'
+
+        fig = visualize_2d_decision_boundary(svm_poly, 10*x1_size, 10*x2_size,
+                                             x_train, y_train, plot_title)
+        fig.write_image(fig_path)
+
     # Plot Dataset2D ground truth decision boundary
     fig_path = decision_boundary_fig_path('Dataset2D-Ground-Truth',
                                           dataset_name)
@@ -207,4 +216,4 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler()])
     dataset1(train_flags)
-    dataset2(train_flags)
+    # dataset2(train_flags)
