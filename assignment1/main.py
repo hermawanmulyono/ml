@@ -53,7 +53,7 @@ class TrainFlags(NamedTuple):
     train_nn: bool
 
 
-def dataset1(flags: TrainFlags):
+def dataset1():
     x1_size = 5
     x2_size = 2
     n_train = 5000
@@ -89,7 +89,7 @@ def dataset1(flags: TrainFlags):
 
     dt, knn, svm_poly, svm_rbf, boosting, nn = _run_all_models(
         x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-        dataset_name, dataset_labels, flags)
+        dataset_name, dataset_labels)
 
     # Plot decision boundary figures
     models = [dt, knn, svm_poly, svm_rbf, boosting, nn]
@@ -109,8 +109,9 @@ def dataset1(flags: TrainFlags):
     if not os.path.exists(fig_path):
         plot_title = f'SVM-Polynomial-Zoomed out {dataset_name} Decision Boundary'
 
-        fig = visualize_2d_decision_boundary(svm_poly, 10*x1_size, 10*x2_size,
-                                             x_train, y_train, plot_title)
+        fig = visualize_2d_decision_boundary(svm_poly, 10 * x1_size,
+                                             10 * x2_size, x_train, y_train,
+                                             plot_title)
         fig.write_image(fig_path)
 
     # Plot Dataset2D ground truth decision boundary
@@ -129,7 +130,7 @@ def dataset1(flags: TrainFlags):
         fig.write_image(fig_path)
 
 
-def dataset2(flags: TrainFlags):
+def dataset2():
     mnist_x_train, mnist_y_train = get_fashion_mnist(train=True)
     x_test, y_test = get_fashion_mnist(train=False)
 
@@ -153,30 +154,25 @@ def dataset2(flags: TrainFlags):
 
     train_sizes = [0.2, 0.4, 0.6, 0.8, 1.0]
 
-    _run_all_models(x_train, y_train, x_val, y_val, x_test, y_test,
-                    train_sizes, dataset_name, dataset_labels, flags)
+    _run_all_models(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
+                    dataset_name, dataset_labels)
 
 
-def _run_all_models(x_train, y_train, x_val, y_val, x_test, y_test,
-                    train_sizes, dataset_name, dataset_labels,
-                    flags: TrainFlags):
+def _run_all_models(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
+                    dataset_name, dataset_labels):
 
     dt = dt_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                 dataset_name, dataset_labels, flags.train_dt)
+                 dataset_name, dataset_labels)
     knn = knn_task(x_train, y_train, x_val, y_val, x_test, y_test, train_sizes,
-                   dataset_name, dataset_labels, flags.train_knn)
+                   dataset_name, dataset_labels)
     svm_poly = svm_poly_task(x_train, y_train, x_val, y_val, x_test, y_test,
-                             train_sizes, dataset_name, dataset_labels,
-                             flags.train_svm)
+                             train_sizes, dataset_name, dataset_labels)
     svm_rbf = svm_rbf_task(x_train, y_train, x_val, y_val, x_test, y_test,
-                           train_sizes, dataset_name, dataset_labels,
-                           flags.train_svm)
+                           train_sizes, dataset_name, dataset_labels)
     boosting = boosting_task(x_train, y_train, x_val, y_val, x_test, y_test,
-                             train_sizes, dataset_name, dataset_labels,
-                             flags.train_boosting)
+                             train_sizes, dataset_name, dataset_labels)
     nn = neural_network_task(x_train, y_train, x_val, y_val, x_test, y_test,
-                             train_sizes, dataset_name, dataset_labels,
-                             flags.train_nn)
+                             train_sizes, dataset_name, dataset_labels)
 
     return dt, knn, svm_poly, svm_rbf, boosting, nn
 
@@ -215,5 +211,5 @@ if __name__ == '__main__':
     train_flags = parse_args()
 
     logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler()])
-    dataset1(train_flags)
-    # dataset2(train_flags)
+    dataset1()
+    dataset2()

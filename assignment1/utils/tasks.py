@@ -25,7 +25,7 @@ from utils.plots import training_size_curve, training_size_curve_nn, \
 
 def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
             y_val: np.ndarray, x_test, y_test, train_sizes: List[float],
-            dataset_name: str, dataset_labels, retrain: bool):
+            dataset_name: str, dataset_labels):
     """Task for decision tree
 
     The tasks are:
@@ -43,7 +43,6 @@ def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
         y_val: Validation set labels
         train_sizes: List of fractions of training sizes
         dataset_name: Name of the dataset
-        retrain: If True, the decision tree will be retrained
 
     Returns:
         Decision tree model
@@ -58,19 +57,9 @@ def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     dataset_name = dataset_name
     model_name = 'DT'
 
-    model = _train_task(constructor_fn,
-                        default_params,
-                        param_grid,
-                        x_train,
-                        y_train,
-                        x_val,
-                        y_val,
-                        train_sizes,
-                        param_name,
-                        dataset_name,
-                        model_name,
-                        retrain,
-                        log_scale=True)
+    model = _train_task(constructor_fn, default_params, param_grid, x_train,
+                        y_train, x_val, y_val, train_sizes, param_name,
+                        dataset_name, model_name, log_scale=True)
 
     _test_task(model, x_test, y_test, model_name, dataset_name, dataset_labels)
 
@@ -87,7 +76,7 @@ def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
 def knn_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
              y_val: np.ndarray, x_test, y_test, train_sizes: List[float],
-             dataset_name: str, dataset_labels, retrain: bool):
+             dataset_name: str, dataset_labels):
     constructor_fn = get_knn
     default_params = {'n_neighbors': 9, 'weights': 'uniform'}
     k_values = list(range(1, 64))
@@ -99,7 +88,7 @@ def knn_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
     model = _train_task(constructor_fn, default_params, param_grid, x_train,
                         y_train, x_val, y_val, train_sizes, param_name,
-                        dataset_name, model_name, retrain)
+                        dataset_name, model_name)
 
     _test_task(model, x_test, y_test, model_name, dataset_name, dataset_labels)
 
@@ -116,7 +105,7 @@ def knn_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
 def svm_poly_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
                   y_val: np.ndarray, x_test, y_test, train_sizes: List[float],
-                  dataset_name: str, dataset_labels, retrain: bool):
+                  dataset_name: str, dataset_labels):
     constructor_fn = get_svm
     default_params = {'kernel': 'poly'}
     param_grid = {'C': [0.1, 1.0, 10.0], 'degree': [1, 2, 3, 4, 5, 6, 7]}
@@ -126,13 +115,13 @@ def svm_poly_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
     model: SVC = _train_task(constructor_fn, default_params, param_grid,
                              x_train, y_train, x_val, y_val, train_sizes,
-                             param_name, dataset_name, model_name, retrain)
+                             param_name, dataset_name, model_name)
 
     best_params = _gs_load(model_name, dataset_name)['best_kwargs']
 
     # Plot accuracy training curve
     svm_accuracy_fig_path = acc_fig_path(model_name, dataset_name)
-    if retrain or (not os.path.exists(svm_accuracy_fig_path)):
+    if not os.path.exists(svm_accuracy_fig_path):
         fig = svm_training_curve_iteration(best_params, x_train, y_train, x_val,
                                            y_val)
         fig.update_layout(
@@ -146,7 +135,7 @@ def svm_poly_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
 def svm_rbf_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
                  y_val: np.ndarray, x_test, y_test, train_sizes: List[float],
-                 dataset_name: str, dataset_labels, retrain: bool):
+                 dataset_name: str, dataset_labels):
     constructor_fn = get_svm
 
     # Equivalent to "scale" option in scikit-learn
@@ -160,25 +149,16 @@ def svm_rbf_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     dataset_name = dataset_name
     model_name = 'SVM-RBF'
 
-    model: SVC = _train_task(constructor_fn,
-                             default_params,
-                             param_grid,
-                             x_train,
-                             y_train,
-                             x_val,
-                             y_val,
-                             train_sizes,
-                             param_name,
-                             dataset_name,
-                             model_name,
-                             retrain,
+    model: SVC = _train_task(constructor_fn, default_params, param_grid,
+                             x_train, y_train, x_val, y_val, train_sizes,
+                             param_name, dataset_name, model_name,
                              log_scale=True)
 
     best_params = _gs_load(model_name, dataset_name)['best_kwargs']
 
     # Plot accuracy training curve
     svm_accuracy_fig_path = acc_fig_path(model_name, dataset_name)
-    if retrain or (not os.path.exists(svm_accuracy_fig_path)):
+    if not os.path.exists(svm_accuracy_fig_path):
         fig = svm_training_curve_iteration(best_params, x_train, y_train, x_val,
                                            y_val)
         fig.update_layout(
@@ -192,7 +172,7 @@ def svm_rbf_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
 def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
                   y_val: np.ndarray, x_test, y_test, train_sizes: List[float],
-                  dataset_name: str, dataset_labels, retrain: bool):
+                  dataset_name: str, dataset_labels):
     constructor_fn = get_boosting
     default_params = {'n_estimators': 256, 'ccp_alpha': 0.001}
     param_grid = {'n_estimators': [512], 'max_depth': [4, 8, 16]}
@@ -200,18 +180,10 @@ def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     dataset_name = dataset_name
     model_name = 'Boosting'
 
-    model: AdaBoostClassifier = _train_task(constructor_fn,
-                                            default_params,
-                                            param_grid,
-                                            x_train,
-                                            y_train,
-                                            x_val,
-                                            y_val,
-                                            train_sizes,
-                                            param_name,
-                                            dataset_name,
-                                            model_name,
-                                            retrain,
+    model: AdaBoostClassifier = _train_task(constructor_fn, default_params,
+                                            param_grid, x_train, y_train, x_val,
+                                            y_val, train_sizes, param_name,
+                                            dataset_name, model_name,
                                             grid_search_fn=grid_search_boosting)
 
     _test_task(model, x_test, y_test, model_name, dataset_name, dataset_labels)
@@ -222,13 +194,13 @@ def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
                         x_val: np.ndarray, y_val: np.ndarray, x_test, y_test,
                         train_sizes: List[float], dataset_name: str,
-                        dataset_labels, retrain: bool):
+                        dataset_labels):
     in_features = x_train.shape[1]
 
     model_name = 'NN'
 
     path_to_state_dict = model_state_dict_path(model_name, dataset_name)
-    if (not retrain) and os.path.exists(path_to_state_dict):
+    if os.path.exists(path_to_state_dict):
         nn_model = nnestimator.NeuralNetworkEstimator.from_state_dict(
             path_to_state_dict)
     else:
@@ -304,18 +276,10 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
 
 
 def _train_task(constructor_fn: Callable[..., ModelType],
-                default_params: Dict[str, Any],
-                param_grid: Dict[str, Any],
-                x_train: np.ndarray,
-                y_train: np.ndarray,
-                x_val: np.ndarray,
-                y_val: np.ndarray,
-                train_sizes: List[float],
-                param_name: str,
-                dataset_name: str,
-                model_name: str,
-                retrain: bool,
-                grid_search_fn=grid_search,
+                default_params: Dict[str, Any], param_grid: Dict[str, Any],
+                x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
+                y_val: np.ndarray, train_sizes: List[float], param_name: str,
+                dataset_name: str, model_name: str, grid_search_fn=grid_search,
                 log_scale=False):
     """Template function for the training tasks for different models
 
@@ -334,7 +298,6 @@ def _train_task(constructor_fn: Callable[..., ModelType],
         param_name: Parameter name to plot on complexity curve
         dataset_name: Dataset name for plot titles and logging purposes
         model_name: Model name for plot titles and logging purposes
-        retrain: If True, the model will be retrained
         log_scale: If True, log scale is used when plotting validation curves
 
     Returns:
@@ -343,8 +306,9 @@ def _train_task(constructor_fn: Callable[..., ModelType],
     """
 
     saved_model_path = model_file_path(model_name, dataset_name)
+    json_path = gs_results_filepath(model_name, dataset_name)
 
-    if retrain or (not os.path.exists(saved_model_path)):
+    if not (os.path.exists(saved_model_path) and os.path.exists(json_path)):
         # Grid search
         logging.info(f'{dataset_name} - {model_name} - Grid search')
         gs = grid_search_fn(constructor_fn, default_params, param_grid, x_train,
