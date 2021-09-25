@@ -184,7 +184,8 @@ def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
                                             param_grid, x_train, y_train, x_val,
                                             y_val, train_sizes, param_name,
                                             dataset_name, model_name,
-                                            grid_search_fn=grid_search_boosting)
+                                            grid_search_fn=grid_search_boosting,
+                                            log_scale=True)
 
     _test_task(model, x_test, y_test, model_name, dataset_name, dataset_labels)
 
@@ -211,19 +212,16 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
         default_params = {
             'in_features': in_features,
             'num_classes': num_classes,
-            'layer_width': 16,
-            'num_layers': 4,
+            'nn_size': 4,
             'learning_rate': 1e-5,
             'batch_size': 128,
-            'epochs': 200,
+            'epochs': 500,
             'verbose': True
         }
 
         param_grid = {
-            'layer_width': [8, 16, 32, 64, 128],
-            'num_layers': [2, 4, 8, 16],
-            'learning_rate': [1e-6, 1e-5, 1e-4, 1e-3, 1e-2],
-            'batch_size': [64, 128, 256, 512]
+            'nn_size': [2, 4, 8, 16, 32, 64],
+            'learning_rate': [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 0.1]
         }
         gs = grid_search_nn(default_params, param_grid, x_train, y_train, x_val,
                             y_val)
@@ -235,23 +233,25 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
         nn_model = gs.best_model
         nn_model.save(path_to_state_dict)
 
-        # Training size curve
-        logging.info(f'{dataset_name} - {model_name} - Training size curve')
-        training_size_fig_title = f'{model_name} - {dataset_name} ' \
-                                  f'Training Size Curve'
-        fig = training_size_curve_nn(gs.best_kwargs,
-                                     x_train,
-                                     y_train,
-                                     x_val,
-                                     y_val,
-                                     train_sizes,
-                                     title=training_size_fig_title)
-        fig_path = training_fig_path(model_name, dataset_name)
-        fig.write_image(fig_path)
+    # Training size curve
+    logging.info(f'{dataset_name} - {model_name} - Training size curve')
+    training_size_fig_title = f'{model_name} - {dataset_name} ' \
+                              f'Training Size Curve'
+    gs = GridSearchResults(**_gs_load(model_name, dataset_name),
+                           best_model=nn_model)
+    fig = training_size_curve_nn(gs,
+                                 x_train,
+                                 y_train,
+                                 x_val,
+                                 y_val,
+                                 train_sizes,
+                                 title=training_size_fig_title)
+    fig_path = training_fig_path(model_name, dataset_name)
+    fig.write_image(fig_path)
 
     # Validation curve
     val_curve_params = [
-        'learning_rate', 'batch_size', 'layer_width', 'num_layers'
+        'learning_rate', 'nn_size'
     ]
     for param_name in val_curve_params:
         _sync_validation_curves(param_name,

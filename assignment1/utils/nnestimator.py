@@ -1,5 +1,6 @@
 import copy
 import logging
+import time
 from typing import Tuple, Optional, Dict, List
 import math
 
@@ -110,8 +111,7 @@ def generate_batches(x_data: np.ndarray, y_data: np.ndarray, batch_size: int,
         yield x_batch, y_batch
 
 
-def sequential_nn(in_features: int, num_classes: int,
-                  hidden_layers: List[int]):
+def sequential_nn(in_features: int, num_classes: int, hidden_layers: List[int]):
     """Gets a sequential neural network model
 
     The sequential model is defined as
@@ -214,7 +214,8 @@ class NeuralNetworkEstimator:
 
         if self._optimizer is None:
             self._optimizer = torch.optim.Adam(self._model.parameters(),
-                                               lr=learning_rate)
+                                               lr=learning_rate,
+                                               weight_decay=1e-5)
 
         optimizer = self._optimizer
 
@@ -454,8 +455,8 @@ def training_curves(training_log: Dict[str, list]):
 
         fig.add_trace(
             go.Scatter(x=x, y=train_loss, mode='lines', name=train_legend))
-        fig.add_trace(
-            go.Scatter(x=x, y=val_loss, mode='lines', name=val_legend))
+        fig.add_trace(go.Scatter(x=x, y=val_loss, mode='lines',
+                                 name=val_legend))
 
         fig.update_layout({
             'xaxis_title': 'epoch',
@@ -474,3 +475,43 @@ def training_curves(training_log: Dict[str, list]):
                          'Training and Validation Accuracy Curves')
 
     return loss_fig, acc_fig
+
+
+def train_nn_multiple(x_train, y_train, x_val, y_val, in_features, num_classes,
+                      nn_size, learning_rate, batch_size, epochs, verbose,
+                      attempts=3):
+
+    nn_ = None
+    fit_time = None
+
+    hidden_layers = [nn_size] * nn_size
+
+    for attempt in range(attempts):
+
+        nn_ = NeuralNetworkEstimator(in_features=in_features,
+                                     num_classes=num_classes,
+                                     hidden_layers=hidden_layers)
+        start = time.time()
+        nn_.fit(x_train,
+                y_train,
+                x_val,
+                y_val,
+                learning_rate=learning_rate,
+                batch_size=batch_size,
+                epochs=epochs,
+                verbose=verbose)
+        end = time.time()
+        fit_time = end - start
+
+        if len(nn_.training_log['epoch']) == epochs:
+            logging.info('Successfully trained a neural network with '
+                         f'validation accuracy of '
+                         f'{np.max(nn_.training_log["val_accuracy"])}')
+            break
+        elif attempt < attempts:
+            logging.info('Neural network training failed. Trying again')
+        else:
+            logging.info('Exceeded maximum attempt in training neural '
+                         'network.')
+
+    return nn_, fit_time

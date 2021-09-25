@@ -26,7 +26,8 @@ import skimage.io
 import torch.random
 from sklearn.model_selection import train_test_split
 
-from utils.data import gen_2d_data, get_fashion_mnist, Dataset2DGroundTruth
+from utils.data import gen_2d_data, _get_fashion_mnist_examples, Dataset2DGroundTruth, \
+    get_fashion_mnist_data
 from utils.plots import visualize_2d_data, visualize_2d_decision_boundary, \
     sample_mnist_dataset
 from utils.tasks import dt_task, knn_task, svm_poly_task, svm_rbf_task, \
@@ -61,18 +62,8 @@ def dataset1():
     n_test = 500
     noise_prob = 0.01
 
-    # gen_2d_data() is a deterministic function, so we cannot call it three
-    # times to produce train, val, and test sets. The correct way to do it
-    # is by producing all samples, then split to train, val, and test.
-    x_all, y_all = gen_2d_data(x1_size, x2_size, n_train + n_val + n_test,
-                               noise_prob)
-
-    x_train, x_valtest, y_train, y_valtest = train_test_split(
-        x_all, y_all, train_size=n_train)
-
-    x_val, x_test, y_val, y_test = train_test_split(x_valtest,
-                                                    y_valtest,
-                                                    test_size=n_test)
+    x_train, y_train, x_val, y_val, x_test, y_test = gen_2d_data(
+        x1_size, x2_size, n_train, n_val, n_test, noise_prob)
 
     assert len(x_train) == len(y_train) == n_train
     assert len(x_val) == len(y_val) == n_val
@@ -131,12 +122,7 @@ def dataset1():
 
 
 def dataset2():
-    mnist_x_train, mnist_y_train = get_fashion_mnist(train=True)
-    x_test, y_test = get_fashion_mnist(train=False)
-
-    x_train, x_val, y_train, y_val = train_test_split(mnist_x_train,
-                                                      mnist_y_train,
-                                                      test_size=0.2)
+    x_train, y_train, x_val, y_val, x_test, y_test = get_fashion_mnist_data()
 
     dataset_labels = [
         'T-shirt/top', 'Trousers', 'Pullover', 'Dress', 'Coat', 'Sandal',

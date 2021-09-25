@@ -10,8 +10,8 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
-from utils.models import SklearnModel, get_nn, get_boosting
-from utils.nnestimator import NeuralNetworkEstimator
+from utils.models import SklearnModel, get_boosting
+from utils.nnestimator import NeuralNetworkEstimator, train_nn_multiple
 
 
 class GridSearchResults(NamedTuple):
@@ -86,25 +86,11 @@ def grid_search(constructor_fn: Callable[..., ModelType], default_params: dict,
 def grid_search_nn(default_params: dict, param_grid: dict, x_train: np.ndarray,
                    y_train: np.ndarray, x_val: np.ndarray, y_val: np.ndarray):
 
-    def fit_fn(in_features, num_classes, layer_width, num_layers, learning_rate,
+    def fit_fn(in_features, num_classes, nn_size, learning_rate,
                batch_size, epochs, verbose):
-        nn_ = get_nn(in_features=in_features,
-                     num_classes=num_classes,
-                     layer_width=layer_width,
-                     num_layers=num_layers)
-        start = time.time()
-        nn_.fit(x_train,
-                y_train,
-                x_val,
-                y_val,
-                learning_rate=learning_rate,
-                batch_size=batch_size,
-                epochs=epochs,
-                verbose=verbose)
-        end = time.time()
-        fit_time = end - start
-
-        return nn_, fit_time
+        return train_nn_multiple(x_train, y_train, x_val, y_val, in_features,
+                                 num_classes, nn_size, learning_rate,
+                                 batch_size, epochs, verbose)
 
     results = _grid_search_template(fit_fn, default_params, param_grid, x_train,
                                     y_train, x_val, y_val)

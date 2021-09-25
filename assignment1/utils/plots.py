@@ -1,21 +1,23 @@
 import copy
 import logging
+import multiprocessing
 import time
-from typing import List, Any, Iterable, Optional, Union
+from typing import List, Iterable, Optional, Union, Tuple
 
 import numpy as np
 import plotly.figure_factory as ff
 from plotly import graph_objects as go
 from plotly.subplots import make_subplots
 from sklearn.exceptions import ConvergenceWarning
-from sklearn.metrics import accuracy_score, confusion_matrix
-from sklearn.model_selection import validation_curve, learning_curve
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import learning_curve
 from sklearn.svm import SVC
 from sklearn.utils import shuffle
 from sklearn.utils._testing import ignore_warnings
 
 from utils.grid_search import GridSearchResults, ModelType
-from utils.models import get_nn, get_svm
+from utils.models import get_svm
+from utils.nnestimator import train_nn_multiple
 from utils.output_grabber import OutputGrabber
 
 
@@ -257,7 +259,7 @@ def training_size_curve(model: ModelType, x_train: np.ndarray,
     return fig
 
 
-def training_size_curve_nn(params: dict, x_train: np.ndarray,
+def training_size_curve_nn(gs: GridSearchResults, x_train: np.ndarray,
                            y_train: np.ndarray, x_val: np.ndarray,
                            y_val: np.ndarray, sizes: List[float],
                            title: str) -> go.Figure:
@@ -270,8 +272,8 @@ def training_size_curve_nn(params: dict, x_train: np.ndarray,
         figure.
 
     Args:
-        params: Parameters to instantiate and `fit()` the
-            neural network i.e. NeuralNetworkEstimator
+        gs: GridSearchResults object which contains the parameters,
+            and the model trained with the full dataset.
         x_train: Training features
         y_train: Training labels
         x_val: Validation features
@@ -296,6 +298,8 @@ def training_size_curve_nn(params: dict, x_train: np.ndarray,
     if not all([0 <= s <= 1.0 for s in sizes]):
         raise ValueError
 
+    params = gs.best_kwargs
+
     num_examples = len(x_train)
 
     x_train, y_train = shuffle(x_train, y_train)
@@ -308,27 +312,26 @@ def training_size_curve_nn(params: dict, x_train: np.ndarray,
     train_times_: List[float] = []
     predict_times_: List[float] = []
 
-    for length in lengths:
+    for idx, length in enumerate(lengths):
         x_train_sampled = x_train[:length]
         y_train_sampled = y_train[:length]
 
-        # Fit a neural network
-        nn = get_nn(in_features=params['in_features'],
-                    num_classes=params['num_classes'],
-                    layer_width=params['layer_width'],
-                    num_layers=params['num_layers'])
+        if idx < len(lengths) - 1:
+            nn, fit_time = train_nn_multiple(x_train_sampled, y_train_sampled,
+                                             x_val, y_val, **params)
+        else:
+            # Lookup in the grid search results gs
+            fit_time = None
+            for kwargs, results in gs.table:
+                if kwargs != params:
+                    continue
+                fit_time = results['fit_time']
 
-        start = time.time()
-        nn.fit(x_train_sampled,
-               y_train_sampled,
-               x_val,
-               y_val,
-               learning_rate=params['learning_rate'],
-               batch_size=params['batch_size'],
-               epochs=params['epochs'],
-               verbose=params['verbose'])
-        finish = time.time()
-        train_times_.append(finish - start)
+            assert fit_time is not None, 'Cannot match best params to table'
+
+            nn = gs.best_model
+
+        train_times_.append(fit_time)
 
         y_pred = nn.predict(x_train_sampled)
         train_accs.append(accuracy_score(y_train_sampled, y_pred))
@@ -398,99 +401,17 @@ def _generate_training_size_curves(sizes: Iterable[float],
     fig.update_yaxes(title_text='Accuracy', row=1, col=1)
     fig.update_yaxes(title_text='Time (s)', row=2, col=1)
 
-    fig.update_layout({'title': title})
+    # fig.update_layout({'title': title})
 
-    return fig
+    fig.update_layout(
+        legend={
+            'orientation': 'h',
+            'yanchor': 'bottom',
+            'y': 1.02,
+            'xanchor': 'right',
+            'x': 1
+        })
 
-
-def complexity_curve(model: ModelType,
-                     x_train: np.ndarray,
-                     y_train: np.ndarray,
-                     x_val: np.ndarray,
-                     y_val: np.ndarray,
-                     param_name: str,
-                     param_range: Any,
-                     title: str,
-                     log_scale,
-                     n_jobs: int = 1) -> go.Figure:
-    """Plots a complexity curve of a model
-
-    Args:
-        log_scale:
-        model: An untrained model
-        x_train: Training set features (n_train, n_features)
-        y_train: Training set labels (n_train, )
-        x_val: Validation set features (n_train, n_features)
-        y_val: Validation set labels (n_train, )
-        param_name: Parameter name to sweep
-        param_range: Values of the `param_name`
-        title: Plot title
-        n_jobs: Number of jobs
-
-    Returns:
-
-    """
-
-    # def train_and_eval(params_: Dict[str, Any]) -> Tuple[float, float]:
-    #     # Copy so that the original model is intact
-    #     model_copy = copy.deepcopy(model)
-    #
-    #     model_copy.fit(x_train, y_train)
-    #
-    #     y_pred_train_ = model_copy.predict(x_train)
-    #     train_acc_ = accuracy_score(y_train, y_pred_train_)
-    #
-    #     y_pred_val_ = model_copy.predict(x_val)
-    #     val_acc_ = accuracy_score(y_val, y_pred_val_)
-    #
-    #     return train_acc_, val_acc_
-    #
-    # keywords = set(params.keys())
-    # if not keywords:
-    #     raise ValueError
-
-    if len(x_train) != len(y_train):
-        raise ValueError
-
-    if len(x_val) != len(y_val):
-        raise ValueError
-
-    if x_train.shape[1] != x_val.shape[1]:
-        raise ValueError
-
-    x_concat = np.concatenate([x_train, x_val], axis=0)
-    y_concat = np.concatenate([y_train, y_val], axis=0)
-
-    assert len(x_concat) == len(y_concat)
-
-    n_train = len(x_train)
-    n_concat = len(x_concat)
-
-    cv = [(np.arange(n_train), np.arange(n_train, n_concat))]
-
-    train_scores_, val_scores_ = validation_curve(model,
-                                                  x_concat,
-                                                  y_concat,
-                                                  param_name=param_name,
-                                                  param_range=param_range,
-                                                  cv=cv,
-                                                  scoring='accuracy',
-                                                  n_jobs=n_jobs)
-
-    train_scores = train_scores_.flatten()
-    val_scores = val_scores_.flatten()
-
-    fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(x=param_range, y=train_scores, mode='lines', name='train'))
-    fig.add_trace(
-        go.Scatter(x=param_range, y=val_scores, mode='lines', name='val'))
-    fig.update_layout({'xaxis_title': param_name, 'yaxis_title': 'Accuracy'})
-
-    if log_scale:
-        fig.update_xaxes(type='log')
-
-    fig.update_layout({'title': title})
     return fig
 
 
@@ -652,8 +573,19 @@ def gs_results_validation_curve(gs: GridSearchResults,
     fig.update_layout({
         'xaxis_title': param_name,
         'yaxis_title': 'Accuracy',
-        'title': plot_title
+        # 'title': plot_title,
+        'width': 640,
+        'height': 480
     })
+
+    fig.update_layout(
+        legend={
+            'orientation': 'h',
+            'yanchor': 'bottom',
+            'y': 1.02,
+            'xanchor': 'right',
+            'x': 1
+        })
 
     if log_scale:
         fig.update_xaxes(type='log')
@@ -690,11 +622,14 @@ def model_confusion_matrix(cm, labels: List[str], plot_title: str):
     fig.update_layout({
         'xaxis_title': 'predicted',
         'yaxis_title': 'ground truth',
-        'title': plot_title
+        # 'title': plot_title
     })
 
+    dims = len(labels) * 50 + 200
+    fig.update_layout({'width': dims, 'height': dims})
+
     for i in range(len(fig.layout.annotations)):
-        fig.layout.annotations[i].font.size = 20
+        fig.layout.annotations[i].font.size = len(labels) + 10
 
     return fig
 
