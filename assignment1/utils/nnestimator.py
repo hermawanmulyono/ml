@@ -203,6 +203,7 @@ class NeuralNetworkEstimator:
             learning_rate=1e-6,
             batch_size=64,
             epochs=50,
+            weight_decay=1e-6,
             verbose=False):
 
         assert len(x_train) == len(y_train)
@@ -215,7 +216,7 @@ class NeuralNetworkEstimator:
         if self._optimizer is None:
             self._optimizer = torch.optim.Adam(self._model.parameters(),
                                                lr=learning_rate,
-                                               weight_decay=1e-5)
+                                               weight_decay=weight_decay)
 
         optimizer = self._optimizer
 
@@ -484,7 +485,7 @@ def train_nn_multiple(x_train, y_train, x_val, y_val, in_features, num_classes,
     nn_ = None
     fit_time = None
 
-    hidden_layers = [nn_size] * nn_size
+    hidden_layers = [nn_size * 4] * nn_size
 
     for attempt in range(attempts):
 
@@ -504,9 +505,12 @@ def train_nn_multiple(x_train, y_train, x_val, y_val, in_features, num_classes,
         fit_time = end - start
 
         if len(nn_.training_log['epoch']) == epochs:
+            best_index = np.argmax(nn_.training_log["val_accuracy"])
+            best_val_acc = nn_.training_log["val_accuracy"][best_index]
+            train_acc = nn_.training_log["train_accuracy"][best_index]
             logging.info('Successfully trained a neural network with '
-                         f'validation accuracy of '
-                         f'{np.max(nn_.training_log["val_accuracy"])}')
+                         f'validation accuracy of {best_val_acc},'
+                         f' training accuracy of {train_acc}')
             break
         elif attempt < attempts:
             logging.info('Neural network training failed. Trying again')

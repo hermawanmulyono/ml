@@ -8,7 +8,6 @@ import numpy as np
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 from sklearn.svm import SVC
-import plotly.graph_objects as go
 
 import utils.nnestimator as nnestimator
 from utils.grid_search import GridSearchResults, grid_search, grid_search_nn, \
@@ -53,23 +52,33 @@ def dt_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     ccp_alphas: List[float] = np.logspace(0, -5, num=10).tolist()
     splitter_values = ['random', 'best']
     param_grid = {'ccp_alpha': ccp_alphas, 'splitter': splitter_values}
-    param_name = 'ccp_alpha'
+    val_param_names = ['ccp_alpha']
     dataset_name = dataset_name
     model_name = 'DT'
 
-    model = _train_task(constructor_fn, default_params, param_grid, x_train,
-                        y_train, x_val, y_val, train_sizes, param_name,
-                        dataset_name, model_name, log_scale=True)
+    model = _train_task(constructor_fn,
+                        default_params,
+                        param_grid,
+                        x_train,
+                        y_train,
+                        x_val,
+                        y_val,
+                        train_sizes,
+                        val_param_names,
+                        dataset_name,
+                        model_name,
+                        log_scale=True)
 
     _test_task(model, x_test, y_test, model_name, dataset_name, dataset_labels)
 
     # For DT, we want to plot the validation curve for the other `splitter`.
-    _sync_other_validation_curves(param_name,
-                                  dataset_name,
-                                  model_name,
-                                  'splitter',
-                                  splitter_values,
-                                  log_scale=True)
+    for val_param_name in val_param_names:
+        _sync_other_validation_curves(val_param_name,
+                                      dataset_name,
+                                      model_name,
+                                      'splitter',
+                                      splitter_values,
+                                      log_scale=True)
 
     return model
 
@@ -82,23 +91,24 @@ def knn_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     k_values = list(range(1, 64))
     weights_values = ['uniform', 'distance']
     param_grid = {'n_neighbors': k_values, 'weights': weights_values}
-    param_name = 'n_neighbors'
+    val_param_names = ['n_neighbors']
     dataset_name = dataset_name
     model_name = 'KNN'
 
     model = _train_task(constructor_fn, default_params, param_grid, x_train,
-                        y_train, x_val, y_val, train_sizes, param_name,
+                        y_train, x_val, y_val, train_sizes, val_param_names,
                         dataset_name, model_name)
 
     _test_task(model, x_test, y_test, model_name, dataset_name, dataset_labels)
 
     # For KNN, we want to plot the validation curve for the other `weights`.
-    _sync_other_validation_curves(param_name,
-                                  dataset_name,
-                                  model_name,
-                                  'weights',
-                                  weights_values,
-                                  log_scale=False)
+    for val_param_name in val_param_names:
+        _sync_other_validation_curves(val_param_name,
+                                      dataset_name,
+                                      model_name,
+                                      'weights',
+                                      weights_values,
+                                      log_scale=False)
 
     return model
 
@@ -109,13 +119,13 @@ def svm_poly_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     constructor_fn = get_svm
     default_params = {'kernel': 'poly'}
     param_grid = {'C': [0.1, 1.0, 10.0], 'degree': [1, 2, 3, 4, 5, 6, 7]}
-    param_name = 'degree'
+    val_param_names = ['degree', 'C']
     dataset_name = dataset_name
     model_name = 'SVM-Polynomial'
 
     model: SVC = _train_task(constructor_fn, default_params, param_grid,
                              x_train, y_train, x_val, y_val, train_sizes,
-                             param_name, dataset_name, model_name)
+                             val_param_names, dataset_name, model_name)
 
     best_params = _gs_load(model_name, dataset_name)['best_kwargs']
 
@@ -145,13 +155,21 @@ def svm_rbf_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     gamma_values_np: np.ndarray = default_gamma * np.logspace(3, -3, num=10)
     gamma_values: List[float] = gamma_values_np.tolist()
     param_grid = {'C': [0.1, 1.0, 10.0, 100], 'gamma': gamma_values}
-    param_name = 'gamma'
+    val_parma_names = ['gamma', 'C']
     dataset_name = dataset_name
     model_name = 'SVM-RBF'
 
-    model: SVC = _train_task(constructor_fn, default_params, param_grid,
-                             x_train, y_train, x_val, y_val, train_sizes,
-                             param_name, dataset_name, model_name,
+    model: SVC = _train_task(constructor_fn,
+                             default_params,
+                             param_grid,
+                             x_train,
+                             y_train,
+                             x_val,
+                             y_val,
+                             train_sizes,
+                             val_parma_names,
+                             dataset_name,
+                             model_name,
                              log_scale=True)
 
     best_params = _gs_load(model_name, dataset_name)['best_kwargs']
@@ -176,14 +194,21 @@ def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     constructor_fn = get_boosting
     default_params = {'n_estimators': 256, 'ccp_alpha': 0.001}
     param_grid = {'n_estimators': [512], 'max_depth': [4, 8, 16]}
-    param_name = 'n_estimators'
+    val_param_names = ['n_estimators', 'max_depth']
     dataset_name = dataset_name
     model_name = 'Boosting'
 
-    model: AdaBoostClassifier = _train_task(constructor_fn, default_params,
-                                            param_grid, x_train, y_train, x_val,
-                                            y_val, train_sizes, param_name,
-                                            dataset_name, model_name,
+    model: AdaBoostClassifier = _train_task(constructor_fn,
+                                            default_params,
+                                            param_grid,
+                                            x_train,
+                                            y_train,
+                                            x_val,
+                                            y_val,
+                                            train_sizes,
+                                            val_param_names,
+                                            dataset_name,
+                                            model_name,
                                             grid_search_fn=grid_search_boosting,
                                             log_scale=True)
 
@@ -215,13 +240,13 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
             'nn_size': 4,
             'learning_rate': 1e-5,
             'batch_size': 128,
-            'epochs': 500,
+            'epochs': 800,
             'verbose': True
         }
 
         param_grid = {
-            'nn_size': [2, 4, 8, 16, 32, 64],
-            'learning_rate': [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 0.1]
+            'nn_size': [2, 4, 6, 8],
+            'learning_rate': [1e-6, 1e-5, 1e-4, 1e-3]
         }
         gs = grid_search_nn(default_params, param_grid, x_train, y_train, x_val,
                             y_val)
@@ -234,25 +259,25 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
         nn_model.save(path_to_state_dict)
 
     # Training size curve
-    logging.info(f'{dataset_name} - {model_name} - Training size curve')
-    training_size_fig_title = f'{model_name} - {dataset_name} ' \
-                              f'Training Size Curve'
-    gs = GridSearchResults(**_gs_load(model_name, dataset_name),
-                           best_model=nn_model)
-    fig = training_size_curve_nn(gs,
-                                 x_train,
-                                 y_train,
-                                 x_val,
-                                 y_val,
-                                 train_sizes,
-                                 title=training_size_fig_title)
     fig_path = training_fig_path(model_name, dataset_name)
-    fig.write_image(fig_path)
+    if not os.path.exists(fig_path):
+        logging.info(f'{dataset_name} - {model_name} - Training size curve')
+        training_size_fig_title = f'{model_name} - {dataset_name} ' \
+                                  f'Training Size Curve'
+        gs = GridSearchResults(**_gs_load(model_name, dataset_name),
+                               best_model=nn_model)
+        fig = training_size_curve_nn(gs,
+                                     x_train,
+                                     y_train,
+                                     x_val,
+                                     y_val,
+                                     train_sizes,
+                                     title=training_size_fig_title)
+
+        fig.write_image(fig_path)
 
     # Validation curve
-    val_curve_params = [
-        'learning_rate', 'nn_size'
-    ]
+    val_curve_params = ['learning_rate', 'nn_size']
     for param_name in val_curve_params:
         _sync_validation_curves(param_name,
                                 dataset_name,
@@ -276,10 +301,17 @@ def neural_network_task(x_train: np.ndarray, y_train: np.ndarray,
 
 
 def _train_task(constructor_fn: Callable[..., ModelType],
-                default_params: Dict[str, Any], param_grid: Dict[str, Any],
-                x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
-                y_val: np.ndarray, train_sizes: List[float], param_name: str,
-                dataset_name: str, model_name: str, grid_search_fn=grid_search,
+                default_params: Dict[str, Any],
+                param_grid: Dict[str, Any],
+                x_train: np.ndarray,
+                y_train: np.ndarray,
+                x_val: np.ndarray,
+                y_val: np.ndarray,
+                train_sizes: List[float],
+                val_param_names: List[str],
+                dataset_name: str,
+                model_name: str,
+                grid_search_fn=grid_search,
                 log_scale=False):
     """Template function for the training tasks for different models
 
@@ -295,7 +327,7 @@ def _train_task(constructor_fn: Callable[..., ModelType],
         x_val: Validation set features
         y_val: Validation set labels
         train_sizes: List of fractions of training sizes
-        param_name: Parameter name to plot on complexity curve
+        val_param_names: List of parameter names to plot on validation curve
         dataset_name: Dataset name for plot titles and logging purposes
         model_name: Model name for plot titles and logging purposes
         log_scale: If True, log scale is used when plotting validation curves
@@ -330,7 +362,9 @@ def _train_task(constructor_fn: Callable[..., ModelType],
                                train_sizes, dataset_name, model_name)
 
     # Validation curve
-    _sync_validation_curves(param_name, dataset_name, model_name, log_scale)
+    for val_param_name in val_param_names:
+        _sync_validation_curves(val_param_name, dataset_name, model_name,
+                                log_scale)
 
     return model
 
