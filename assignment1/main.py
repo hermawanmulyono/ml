@@ -24,7 +24,7 @@ import os
 import numpy as np
 import skimage.io
 import torch.random
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 
 from utils.data import gen_2d_data, _get_fashion_mnist_examples, Dataset2DGroundTruth, \
     get_fashion_mnist_data
@@ -105,12 +105,14 @@ def dataset1():
                                              plot_title)
         fig.write_image(fig_path)
 
+    # Ground truth model
+    gt_model = Dataset2DGroundTruth(x1_size, x2_size)
+
     # Plot Dataset2D ground truth decision boundary
     fig_path = decision_boundary_fig_path('Dataset2D-Ground-Truth',
                                           dataset_name)
     if not os.path.exists(fig_path):
         plot_title = f'{dataset_name}'
-        gt_model = Dataset2DGroundTruth(x1_size, x2_size)
         fig = visualize_2d_decision_boundary(gt_model,
                                              x1_size,
                                              x2_size,
@@ -119,6 +121,14 @@ def dataset1():
                                              plot_title,
                                              scatter_size=5)
         fig.write_image(fig_path)
+
+    # Evaluate the best possible accuracy for train, val and test
+    y_pred = gt_model.predict(x_train)
+    print(f'Best train accuracy {accuracy_score(y_train, y_pred)}')
+    y_pred = gt_model.predict(x_val)
+    print(f'Best train accuracy {accuracy_score(y_val, y_pred)}')
+    y_pred = gt_model.predict(x_test)
+    print(f'Best train accuracy {accuracy_score(y_test, y_pred)}')
 
 
 def dataset2():

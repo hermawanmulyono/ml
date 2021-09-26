@@ -17,7 +17,8 @@ pip install -r requirements.txt
 
 ## Running The Code
 
-Use the `main.py` script to run the code.
+Use the `main.py` script to run the code. This will automatically generate 
+all plots and results.
 
 ```shell
 # Must be run inside the virtual environment
