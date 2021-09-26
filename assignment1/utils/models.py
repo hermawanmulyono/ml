@@ -33,7 +33,7 @@ def get_boosting(n_estimators: int,
                  ccp_alpha: float,
                  max_depth=10) -> AdaBoostClassifier:
     base_estimator = DecisionTreeClassifier(criterion='entropy',
-                                            splitter='best',
+                                            splitter='random',
                                             ccp_alpha=ccp_alpha,
                                             max_depth=max_depth)
 

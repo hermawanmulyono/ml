@@ -193,7 +193,7 @@ def boosting_task(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
                   dataset_name: str, dataset_labels):
     constructor_fn = get_boosting
     default_params = {'n_estimators': 256, 'ccp_alpha': 0.001}
-    param_grid = {'n_estimators': [512], 'max_depth': [4, 8, 16]}
+    param_grid = {'n_estimators': [512], 'max_depth': [2, 4, 8, 16, 32, 64]}
     val_param_names = ['n_estimators', 'max_depth']
     dataset_name = dataset_name
     model_name = 'Boosting'
