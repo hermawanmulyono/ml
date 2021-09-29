@@ -1,10 +1,11 @@
-
+import logging
 
 from utils.task1 import task1
 
 
-
 def main():
+    logging.basicConfig(level=logging.INFO)
+
     task1()
 
 
