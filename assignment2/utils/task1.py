@@ -128,68 +128,27 @@ def grid_run(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable,
 
 
 def onemax_task():
-    # OneMax
     fitness = mlrose.OneMax()
-    for onemax_length in [20, 100, 500]:
-        onemax_problem = mlrose.DiscreteOpt(length=onemax_length,
-                                            fitness_fn=fitness,
-                                            maximize=True)
+    vector_lengths = [20, 100, 500]
+    problems = [
+        mlrose.DiscreteOpt(length=length, fitness_fn=fitness, maximize=True)
+        for length in vector_lengths
+    ]
+    problem_names = [f'onemax_{length}' for length in vector_lengths]
 
-        algs_params_tuples = []
-        hill_climb_params_grid = {'restarts': [0, 10, 50]}
-        algs_params_tuples.append((mlrose.hill_climb, hill_climb_params_grid))
-
-        sa_params_grid = {'max_attempts': [10, onemax_length]}
-        algs_params_tuples.append((mlrose.simulated_annealing, sa_params_grid))
-
-        ga_params_grid = {
-            'pop_size': [200],
-            'mutation_prob': np.logspace(-1, -5, 10),
-            'max_attempts': [10, onemax_length]
-        }
-        algs_params_tuples.append((mlrose.genetic_alg, ga_params_grid))
-
-        mimic_params_grid = {'max_attempts': [10, onemax_length]}
-        algs_params_tuples.append((mlrose.mimic, mimic_params_grid))
-
-        for alg, params_grid in algs_params_tuples:
-            alg_name = alg.__name__
-            logging.info(f'Running {alg_name}')
-            grid_results = grid_run(onemax_problem, alg, params_grid, repeats=20)
-            json_path = grid_results_json(f'onemax-{onemax_length}', alg_name)
-            with open(json_path, 'w') as j:
-                serialized = serialize_grid_results(grid_results)
-                json.dump(serialized, j, indent=4)
+    return _task1_template(problems, problem_names)
 
 
 def fourpeaks_task():
-    fitness = mlrose.SixPeaks()
-    length = 100
-    problem_fit = mlrose.DiscreteOpt(length=length,
-                                     fitness_fn=fitness,
-                                     maximize=True)
-    print('Four peaks')
+    fitness = mlrose.FourPeaks()
+    vector_lengths = [20, 100, 500]
+    problems = [
+        mlrose.DiscreteOpt(length=length, fitness_fn=fitness, maximize=True)
+        for length in vector_lengths
+    ]
+    problem_names = [f'fourpeaks_{length}' for length in vector_lengths]
 
-    best_state, best_fitness = mlrose.hill_climb(problem_fit, restarts=100)
-    print(f'Hill climb: {best_fitness}')
-
-    best_state, best_fitness = mlrose.simulated_annealing(problem_fit,
-                                                          max_attempts=length)
-    print(f'Simulated annealing: {best_fitness}')
-
-    # Solve problem using the genetic algorithm
-    for mutation_prob in np.logspace(-1, -5, 10)[::-1]:
-        print(f'mutation: {mutation_prob}')
-        for _ in range(10):
-            best_state, best_fitness = mlrose.genetic_alg(
-                problem_fit,
-                pop_size=200,
-                mutation_prob=mutation_prob,
-                max_attempts=length)
-            print(f'GA: {best_fitness}')
-
-    best_state, best_fitness = mlrose.mimic(problem_fit, max_attempts=length)
-    print(f'MIMIC: {best_fitness}')
+    return _task1_template(problems, problem_names)
 
 
 def maxkcolor_edges(num_vertices: int, num_edges: int):
@@ -225,52 +184,56 @@ def maxkcolor_edges(num_vertices: int, num_edges: int):
 
 
 def max_kcolor_task():
-    num_vertices = 30
-    num_edges = 20
+    vert_edge_pairs = [(30, 20), (60, 40), (90, 60)]
 
-    fitness = mlrose.MaxKColor(maxkcolor_edges(num_vertices, num_edges))
-    problem_fit = mlrose.DiscreteOpt(length=num_vertices,
-                                     fitness_fn=fitness,
-                                     maximize=True)
+    problems = []
+    problem_names = []
+    for num_vertices, num_edges in vert_edge_pairs:
+        fitness = mlrose.MaxKColor(maxkcolor_edges(num_vertices, num_edges))
+        problem_fit = mlrose.DiscreteOpt(length=num_vertices,
+                                         fitness_fn=fitness,
+                                         maximize=True)
+        problems.append(problem_fit)
+        problem_names.append(f'maxkcolor_v{num_vertices}_e{num_edges}')
 
-    print('MaxKColor')
+    return _task1_template(problems, problem_names)
 
-    # Solve problem using the genetic algorithm
-    best_state, best_fitness = mlrose.genetic_alg(problem_fit)
 
-    print(f'GA: {best_fitness}')
+def _task1_template(problems: List[mlrose.DiscreteOpt],
+                    problem_names: List[str]):
+    for problem, problem_name in zip(problems, problem_names):
 
-    best_state, best_fitness = mlrose.hill_climb(problem_fit)
+        algs_params_tuples = []
+        hill_climb_params_grid = {'restarts': [0, 10, 50]}
+        algs_params_tuples.append((mlrose.hill_climb, hill_climb_params_grid))
 
-    print(f'Hill climb: {best_fitness}')
+        vector_length = problem.length
+        sa_params_grid = {'max_attempts': [10, vector_length]}
+        algs_params_tuples.append((mlrose.simulated_annealing, sa_params_grid))
 
-    best_state, best_fitness = mlrose.mimic(problem_fit)
+        ga_params_grid = {
+            'pop_size': [200],
+            'mutation_prob': np.logspace(-1, -5, 10),
+            'max_attempts': [10, vector_length]
+        }
+        algs_params_tuples.append((mlrose.genetic_alg, ga_params_grid))
 
-    print(f'MIMIC: {best_fitness}')
+        mimic_params_grid = {'max_attempts': [10, vector_length]}
+        algs_params_tuples.append((mlrose.mimic, mimic_params_grid))
+
+        for alg, params_grid in algs_params_tuples:
+            alg_name = alg.__name__
+            logging.info(f'Running {problem_name} {alg_name}')
+            grid_results = grid_run(problem, alg, params_grid, repeats=20)
+            json_path = grid_results_json(f'{problem_name}', alg_name)
+            with open(json_path, 'w') as j:
+                serialized = serialize_grid_results(grid_results)
+                json.dump(serialized, j, indent=4)
 
 
 def task1():
     """A task to compare some optimization problems
     """
-    # fourpeaks_task()
     onemax_task()
-    # max_kcolor_task()
-
-    # FourPeaks
-    fitness = mlrose.SixPeaks()
-    fourpeaks_length = 100
-    fourpeak_problem = mlrose.DiscreteOpt(length=fourpeaks_length,
-                                          fitness_fn=fitness,
-                                          maximize=True)
-
-    # MaxKColor
-    num_vertices = 30
-    num_edges = 20
-
-    fitness = mlrose.MaxKColor(maxkcolor_edges(num_vertices, num_edges))
-    maxkcolor_problem = mlrose.DiscreteOpt(length=num_vertices,
-                                           fitness_fn=fitness,
-                                           maximize=True)
-
-    # for problem in [onemax_problem, fourpeak_problem, maxkcolor_problem]:
-    #     grid_run(problem, alg_fn, param_grid, repeats=10)
+    fourpeaks_task()
+    max_kcolor_task()
