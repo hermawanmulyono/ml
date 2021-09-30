@@ -9,7 +9,6 @@ from typing import NamedTuple, List, Tuple
 import numpy as np
 import six
 import sys
-
 from utils.outputs import grid_results_json
 
 sys.modules['sklearn.externals.six'] = six

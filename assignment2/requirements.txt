@@ -1,3 +1,5 @@
 six
 mlrose
 numpy
+pandas
+plotly
