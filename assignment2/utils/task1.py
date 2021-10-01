@@ -2,53 +2,20 @@ import copy
 import json
 import logging
 import multiprocessing
+import os
 import time
-from collections import Callable
-from typing import NamedTuple, List, Tuple
+from typing import List, Callable, Tuple, Dict
 
 import numpy as np
 import six
 import sys
+
+from utils.grid import serialize_grid_results, SingleResults, MultipleResults, \
+    grid_args_generator, parse_grid_results
 from utils.outputs import grid_results_json
 
 sys.modules['sklearn.externals.six'] = six
 import mlrose
-
-
-class SingleResults(NamedTuple):
-    best_state: np.ndarray
-    best_fitness: float
-    fitness_curve: np.ndarray
-    duration: float
-
-
-def serialize_single_results(single_results: SingleResults):
-    s = {
-        'best_state': single_results.best_state.astype(int).tolist(),
-        'best_fitness': single_results.best_fitness,
-        'fitness_curve': single_results.fitness_curve.astype(float).tolist(),
-        'duration': single_results.duration
-    }
-    return s
-
-
-# For containing repeated experiment results
-MultipleResults = List[SingleResults]
-
-
-def serialize_multiple_results(multiple_results: MultipleResults):
-    return [serialize_single_results(s) for s in multiple_results]
-
-
-# List of [..., (kwargs, multiple_results) ,...]
-GridResults = List[Tuple[dict, MultipleResults]]
-
-
-def serialize_grid_results(grid_results: GridResults):
-    serialized = [
-        (kwargs, serialize_multiple_results(m)) for kwargs, m in grid_results
-    ]
-    return serialized
 
 
 def run_single(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable, kwargs: dict):
@@ -63,22 +30,6 @@ def run_single(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable, kwargs: dict):
                                    duration)
 
     return single_results
-
-
-def _increase_grid_index(grid_index_: List[int], param_grid: dict):
-    param_names: List[str] = list(param_grid.keys())
-
-    grid_index_ = copy.deepcopy(grid_index_)
-
-    for i in range(len(grid_index_)):
-        grid_index_[i] += 1
-
-        if grid_index_[i] >= len(param_grid[param_names[i]]):
-            grid_index_[i] = 0
-        else:
-            break
-
-    return grid_index_
 
 
 def run_multiple(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable,
@@ -98,27 +49,9 @@ def run_multiple(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable,
 
 def grid_run(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable,
              param_grid: dict, repeats: int):
-    param_names: List[str] = list(param_grid.keys())
-
-    def args_generator():
-        grid_index = [0] * len(param_names)
-
-        while True:
-            kwargs = copy.deepcopy(param_grid)
-            update = {
-                key: param_grid[key][gi]
-                for gi, key in zip(grid_index, param_names)
-            }
-            kwargs.update(update)
-
-            yield kwargs
-
-            grid_index = _increase_grid_index(grid_index, param_grid)
-            if all([gi == 0 for gi in grid_index]):
-                break
 
     table: List[Tuple[dict, MultipleResults]] = []
-    for kwargs in args_generator():
+    for kwargs in grid_args_generator(param_grid):
         logging.info(f'Running {kwargs}')
         multiple_results = run_multiple(problem_fit, alg_fn, kwargs, repeats)
         table.append((kwargs, multiple_results))
@@ -201,33 +134,67 @@ def max_kcolor_task():
 def _task1_template(problems: List[mlrose.DiscreteOpt],
                     problem_names: List[str]):
     for problem, problem_name in zip(problems, problem_names):
-
-        algs_params_tuples = []
-        hill_climb_params_grid = {'restarts': [0, 10, 50]}
-        algs_params_tuples.append((mlrose.hill_climb, hill_climb_params_grid))
-
-        vector_length = problem.length
-        sa_params_grid = {'max_attempts': [10, vector_length]}
-        algs_params_tuples.append((mlrose.simulated_annealing, sa_params_grid))
-
-        ga_params_grid = {
-            'pop_size': [200],
-            'mutation_prob': np.logspace(-1, -5, 10),
-            'max_attempts': [10, vector_length]
-        }
-        algs_params_tuples.append((mlrose.genetic_alg, ga_params_grid))
-
-        mimic_params_grid = {'max_attempts': [10, vector_length]}
-        algs_params_tuples.append((mlrose.mimic, mimic_params_grid))
+        algs_params_tuples = _make_alg_params_tuple(problem)
 
         for alg, params_grid in algs_params_tuples:
             alg_name = alg.__name__
-            logging.info(f'Running {problem_name} {alg_name}')
-            grid_results = grid_run(problem, alg, params_grid, repeats=20)
             json_path = grid_results_json(f'{problem_name}', alg_name)
-            with open(json_path, 'w') as j:
-                serialized = serialize_grid_results(grid_results)
-                json.dump(serialized, j, indent=4)
+
+            if not os.path.exists(json_path):
+                logging.info(f'Running {problem_name} {alg_name}')
+                grid_results = grid_run(problem, alg, params_grid, repeats=20)
+
+                # Write results to disk
+                with open(json_path, 'w') as j:
+                    serialized = serialize_grid_results(grid_results)
+                    json.dump(serialized, j, indent=4)
+
+            with open(json_path, 'r') as j:
+                json_grid_results = json.load(j)
+
+            grid_results = parse_grid_results(json_grid_results)
+
+
+
+
+def _make_alg_params_tuple(problem: mlrose.DiscreteOpt) \
+        -> List[Tuple[Callable, Dict[str, Any]]]:
+    """Helper to create list of alg, param_grid tuples
+
+    The returned list of tuples can be used for grid-search
+    purposes.
+
+    Args:
+        problem: A discrete optimization problem. This must
+            have been initialized with the proper fitness
+            function and all the necessary parameters.
+
+    Returns:
+        List of tuples [..., (alg_function, param_grid),...]
+        corresponding to hill climb, simulated annealing,
+        genetic algorithm, and MIMIC.
+
+    """
+    algs_params_tuples = []
+
+    # Hill climbing
+    hill_climb_param_grid = {'restarts': [0, 10, 50]}
+    algs_params_tuples.append((mlrose.hill_climb, hill_climb_param_grid))
+
+    # Simulated annealing
+    vector_length = problem.length
+    sa_param_grid = {'max_attempts': [10, vector_length]}
+    algs_params_tuples.append((mlrose.simulated_annealing, sa_param_grid))
+
+    # Genetic algorithm
+    ga_param_grid = {
+        'pop_size': [200],
+        'mutation_prob': np.logspace(-1, -5, 10),
+        'max_attempts': [10, vector_length]
+    }
+    algs_params_tuples.append((mlrose.genetic_alg, ga_param_grid))
+
+    return algs_params_tuples
 
 
 def task1():
