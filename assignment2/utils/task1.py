@@ -4,13 +4,13 @@ import logging
 import multiprocessing
 import os
 import time
-from typing import List, Callable, Tuple, Dict
+from typing import List, Callable, Tuple, Dict, Any
 
 import numpy as np
 import six
 import sys
 
-from utils.grid import serialize_grid_results, SingleResults, MultipleResults, \
+from utils.grid import serialize_grid_results, OptimizationResults, MultipleResults, \
     grid_args_generator, parse_grid_results
 from utils.outputs import grid_results_json
 
@@ -26,8 +26,8 @@ def run_single(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable, kwargs: dict):
     end = time.time()
     duration = end - start
 
-    single_results = SingleResults(best_state, best_fitness, fitness_curve,
-                                   duration)
+    single_results = OptimizationResults(best_state, best_fitness, fitness_curve,
+                                         duration)
 
     return single_results
 
@@ -41,7 +41,7 @@ def run_multiple(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable,
 
     n_cpus = multiprocessing.cpu_count()
     with multiprocessing.Pool(n_cpus) as pool:
-        multiple_results: List[SingleResults] = pool.starmap(
+        multiple_results: List[OptimizationResults] = pool.starmap(
             run_single, args_generator())
 
     return multiple_results
@@ -155,10 +155,8 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
             grid_results = parse_grid_results(json_grid_results)
 
 
-
-
-def _make_alg_params_tuple(problem: mlrose.DiscreteOpt) \
-        -> List[Tuple[Callable, Dict[str, Any]]]:
+def _make_alg_params_tuple(
+        problem: mlrose.DiscreteOpt) -> List[Tuple[Callable, Dict[str, Any]]]:
     """Helper to create list of alg, param_grid tuples
 
     The returned list of tuples can be used for grid-search

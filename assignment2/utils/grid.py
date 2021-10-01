@@ -3,25 +3,47 @@ Grid search functions
 """
 
 import copy
-import pathlib
-from os import PathLike
-from typing import NamedTuple, List, Tuple, Dict, Any, Union
+from typing import NamedTuple, List, Tuple, Dict, Any
 
 import numpy as np
 
 
-class SingleResults(NamedTuple):
+class OptimizationResults(NamedTuple):
+    """Random Optimization Results
+
+    """
     best_state: np.ndarray
     best_fitness: float
     fitness_curve: np.ndarray
     duration: float
 
 
+class NNResults(NamedTuple):
+    train_accuracy: float
+    val_accuracy: float
+    fit_time: float
+
+
+class Stats(NamedTuple):
+    mean: float
+    median: float
+    std: float
+    q1: float
+    q3: float
+    min: float
+    max: float
+
+
+class MultipleResultsSummary(NamedTuple):
+    best_fitness: Stats
+    duration: Stats
+
+
 # JSON-serializable single results
 JSONSingleResults = Dict[str, Any]
 
 # For containing repeated experiment results
-MultipleResults = List[SingleResults]
+MultipleResults = List[OptimizationResults]
 
 # JSON-serializable multiple results
 JSONMultipleResults = List[JSONSingleResults]
@@ -34,7 +56,7 @@ JSONGridResults = List[Tuple[dict, JSONMultipleResults]]
 
 
 def serialize_single_results(
-        single_results: SingleResults) -> JSONSingleResults:
+        single_results: OptimizationResults) -> JSONSingleResults:
     s = {
         'best_state': single_results.best_state.astype(int).tolist(),
         'best_fitness': single_results.best_fitness,
@@ -44,7 +66,7 @@ def serialize_single_results(
     return s
 
 
-def parse_single_results(d: JSONSingleResults) -> SingleResults:
+def parse_single_results(d: JSONSingleResults) -> OptimizationResults:
     """Parses the given dictionary to SingleResults object
 
     Args:
@@ -65,7 +87,7 @@ def parse_single_results(d: JSONSingleResults) -> SingleResults:
     fitness_curve = np.ndarray(d['fitness_curve'])
     duration = d['duration']
 
-    return SingleResults(best_state, best_fitness, fitness_curve, duration)
+    return OptimizationResults(best_state, best_fitness, fitness_curve, duration)
 
 
 def serialize_multiple_results(
@@ -142,3 +164,37 @@ def grid_args_generator(param_grid: Dict[str, Any]):
         grid_index = _increase_grid_index(grid_index, param_grid)
         if all([gi == 0 for gi in grid_index]):
             break
+
+
+def array_stats(x: np.ndarray) -> Stats:
+    """Compute statistics of the given array
+
+    Args:
+        x: 1-dimensional array
+
+    Returns:
+        A Stats object of the given array
+
+    """
+    mean = float(np.mean(x))
+    min_, q1, median, q3, max_ = np.percentile(x, [0, 25, 50, 75, 100])
+    std = float(np.std(x))
+    return Stats(mean, float(median), std, float(q1), float(q3), float(min_),
+                 float(max_))
+
+
+def summarize_multiple_results(multiple_results: MultipleResults):
+
+    best_fitness = np.array([m.best_fitness for m in multiple_results])
+    best_fitness_stats = array_stats(best_fitness)
+
+    duration = np.array([m.duration for m in multiple_results])
+    duration_stats = array_stats(duration)
+
+    return MultipleResultsSummary(best_fitness_stats, duration_stats)
+
+
+def summarize_grid_results(grid_results: GridResults):
+    return [
+        (kwargs, summarize_multiple_results(m)) for kwargs, m in grid_results
+    ]

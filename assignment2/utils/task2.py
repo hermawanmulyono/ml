@@ -1,15 +1,23 @@
 import logging
 
+import joblib
+import numpy as np
 import six
 import sys
 
 from sklearn.metrics import accuracy_score
+
+from utils.outputs import nn_joblib
 
 sys.modules['sklearn.externals.six'] = six
 import mlrose
 import plotly.express as px
 
 from utils.data import gen_2d_data
+
+
+def schedule_fn(t, offset: int):
+    return mlrose.GeomDecay().evaluate(t + offset)
 
 
 def task2():
@@ -27,15 +35,50 @@ def task2():
     assert len(x_val) == len(y_val) == n_val
     assert len(x_test) == len(y_test) == n_test
 
+    '''
+    Need to take care of all algorithms
+      1. gradient_descent
+      2. simulated_annealing
+      3. hill_climb
+    '''
+
     hidden_nodes = [16] * 4
-    nn_model = mlrose.NeuralNetwork(hidden_nodes,
-                                    algorithm='simulated_annealing',
-                                    # learning_rate=1e-5,
-                                    max_iters=10000,
-                                    curve=True)
+
+    weights = None
+    steps = 0
 
     logging.info('Training neural network')
-    nn_model.fit(x_train, y_train)
+    for i in range(20000):
+        kwargs = {'offset': steps}
+        schedule = mlrose.CustomSchedule(schedule_fn, **kwargs)
+        max_iters = 1
+        nn_model = mlrose.NeuralNetwork(hidden_nodes,
+                                        algorithm='random_hill_climb',
+                                        # learning_rate=1e-5,
+                                        max_iters=max_iters,
+                                        curve=True,
+                                        schedule=schedule)
+        nn_model.fit(x_train, y_train, init_weights=weights)
+        steps += max_iters
+        weights = nn_model.fitted_weights
+
+        if i % 100 == 0:
+            y_pred = nn_model.predict(x_train)
+            train_acc = accuracy_score(y_train, y_pred)
+            logging.info(f'Train accuracy: {train_acc}')
+
+            y_pred = nn_model.predict(x_val)
+            val_acc = accuracy_score(y_val, y_pred)
+            logging.info(f'Val accuracy: {val_acc}')
+
+    nn_path = nn_joblib('simulated_annealing')
+    joblib.dump(nn_model, nn_path)
+
+    fitness_curve = nn_model.fitness_curve
+    fig = px.line(x=list(range(len(fitness_curve))), y=fitness_curve)
+    fig.show()
+
+    nn_model = joblib.load(nn_path)
 
     y_pred = nn_model.predict(x_train)
     train_acc = accuracy_score(y_train, y_pred)
@@ -48,3 +91,4 @@ def task2():
     fitness_curve = nn_model.fitness_curve
     fig = px.line(x=list(range(len(fitness_curve))), y=fitness_curve)
     fig.show()
+

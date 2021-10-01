@@ -8,3 +8,9 @@ if not os.path.exists(OUTPUT_DIRECTORY):
 
 def grid_results_json(problem_name: str, alg_name: str):
     return f'{OUTPUT_DIRECTORY}/{problem_name}_{alg_name}.json'
+
+
+def nn_joblib(optimizer_name: str):
+    """MLRose neural-network model"""
+    return f'nn_{optimizer_name}.joblib'
+
