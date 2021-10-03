@@ -12,5 +12,5 @@ def grid_results_json(problem_name: str, alg_name: str):
 
 def nn_joblib(optimizer_name: str):
     """MLRose neural-network model"""
-    return f'nn_{optimizer_name}.joblib'
+    return f'{OUTPUT_DIRECTORY}/nn_{optimizer_name}.joblib'
 

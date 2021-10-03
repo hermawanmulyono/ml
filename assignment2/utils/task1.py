@@ -10,8 +10,9 @@ import numpy as np
 import six
 import sys
 
-from utils.grid import serialize_grid_results, OptimizationResults, MultipleResults, \
-    grid_args_generator, parse_grid_results
+from utils.grid import serialize_grid_table, OptimizationResults, \
+    MultipleResults, \
+    grid_args_generator, parse_grid_results, GridTable
 from utils.outputs import grid_results_json
 
 sys.modules['sklearn.externals.six'] = six
@@ -26,10 +27,10 @@ def run_single(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable, kwargs: dict):
     end = time.time()
     duration = end - start
 
-    single_results = OptimizationResults(best_state, best_fitness, fitness_curve,
-                                         duration)
+    optimization_results = OptimizationResults(best_state, best_fitness,
+                                               fitness_curve, duration)
 
-    return single_results
+    return optimization_results
 
 
 def run_multiple(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable,
@@ -50,7 +51,7 @@ def run_multiple(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable,
 def grid_run(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable,
              param_grid: dict, repeats: int):
 
-    table: List[Tuple[dict, MultipleResults]] = []
+    table: GridTable = []
     for kwargs in grid_args_generator(param_grid):
         logging.info(f'Running {kwargs}')
         multiple_results = run_multiple(problem_fit, alg_fn, kwargs, repeats)
@@ -146,7 +147,7 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
 
                 # Write results to disk
                 with open(json_path, 'w') as j:
-                    serialized = serialize_grid_results(grid_results)
+                    serialized = serialize_grid_table(grid_results)
                     json.dump(serialized, j, indent=4)
 
             with open(json_path, 'r') as j:
