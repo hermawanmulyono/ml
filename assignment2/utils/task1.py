@@ -12,7 +12,7 @@ import sys
 
 from utils.grid import serialize_grid_table, OptimizationResults, \
     MultipleResults, \
-    grid_args_generator, parse_grid_results, GridTable
+    grid_args_generator, parse_grid_table, GridTable
 from utils.outputs import grid_results_json
 
 sys.modules['sklearn.externals.six'] = six
@@ -153,7 +153,7 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
             with open(json_path, 'r') as j:
                 json_grid_results = json.load(j)
 
-            grid_results = parse_grid_results(json_grid_results)
+            grid_results = parse_grid_table(json_grid_results)
 
 
 def _make_alg_params_tuple(

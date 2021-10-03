@@ -150,9 +150,9 @@ def serialize_grid_table(grid_table: GridTable) -> JSONGridTable:
     return serialized
 
 
-def parse_grid_results(json_grid_results: JSONGridTable) -> GridTable:
+def parse_grid_table(json_grid_table: JSONGridTable) -> GridTable:
     return [
-        (kwargs, _parse_multiple_results(m)) for kwargs, m in json_grid_results
+        (kwargs, _parse_multiple_results(m)) for kwargs, m in json_grid_table
     ]
 
 
@@ -242,7 +242,7 @@ def _summarize_multiple_results(multiple_results: MultipleResults,
         train_accuracy = np.array([m.train_accuracy for m in multiple_results])
         train_accuracy_stats = _array_stats(train_accuracy)
 
-        val_accuracy = np.array([m.train_accuracy for m in multiple_results])
+        val_accuracy = np.array([m.val_accuracy for m in multiple_results])
         val_accuracy_stats = _array_stats(val_accuracy)
 
         fit_time = np.array([m.fit_time for m in multiple_results])
@@ -277,7 +277,7 @@ def summarize_grid_table(grid_table: GridTable, problem: str):
 
     argmax = np.argmax(metric_vals)
 
-    kwargs, summary = grid_table[argmax][0]
+    kwargs, summary = summary_table[argmax]
 
     if problem == 'nn':
         summary: NNSummary
