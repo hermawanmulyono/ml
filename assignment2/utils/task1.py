@@ -12,8 +12,10 @@ import sys
 
 from utils.grid import serialize_grid_table, OptimizationResults, \
     MultipleResults, \
-    grid_args_generator, parse_grid_table, GridTable
-from utils.outputs import grid_results_json
+    grid_args_generator, parse_grid_table, GridTable, summarize_grid_table, \
+    serialize_grid_optimization_summary, GridOptimizationSummary, \
+    parse_grid_optimization_summary
+from utils.outputs import optimization_grid_table, optimization_grid_summary
 
 sys.modules['sklearn.externals.six'] = six
 import mlrose
@@ -134,26 +136,44 @@ def max_kcolor_task():
 
 def _task1_template(problems: List[mlrose.DiscreteOpt],
                     problem_names: List[str]):
+
     for problem, problem_name in zip(problems, problem_names):
+        # Each problem is solved multiple times with different algorithms
+
         algs_params_tuples = _make_alg_params_tuple(problem)
 
         for alg, params_grid in algs_params_tuples:
             alg_name = alg.__name__
-            json_path = grid_results_json(f'{problem_name}', alg_name)
+            json_path = optimization_grid_table(f'{problem_name}', alg_name)
 
             if not os.path.exists(json_path):
                 logging.info(f'Running {problem_name} {alg_name}')
-                grid_results = grid_run(problem, alg, params_grid, repeats=20)
+                grid_table = grid_run(problem, alg, params_grid, repeats=20)
+                grid_table_serialized = serialize_grid_table(grid_table)
 
                 # Write results to disk
                 with open(json_path, 'w') as j:
-                    serialized = serialize_grid_table(grid_results)
-                    json.dump(serialized, j, indent=4)
+                    json.dump(grid_table_serialized, j, indent=4)
 
             with open(json_path, 'r') as j:
-                json_grid_results = json.load(j)
+                grid_table_serialized = json.load(j)
 
-            grid_results = parse_grid_table(json_grid_results)
+            grid_table = parse_grid_table(grid_table_serialized)
+            grid_summary = summarize_grid_table(grid_table, 'optimization')
+
+            grid_summary_json_path = optimization_grid_summary(problem_name,
+                                                               alg_name)
+            if not os.path.exists(grid_summary_json_path):
+                with open(grid_summary_json_path, 'w') as j:
+                    grid_summary_serialized = \
+                        serialize_grid_optimization_summary(grid_summary)
+                    json.dump(grid_summary_serialized, j, indent=4)
+
+            with open(grid_summary_json_path) as j:
+                grid_summary_serialized = json.load(j)
+
+            grid_summary: GridOptimizationSummary = \
+                parse_grid_optimization_summary(grid_summary_serialized)
 
 
 def _make_alg_params_tuple(

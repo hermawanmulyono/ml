@@ -6,8 +6,12 @@ if not os.path.exists(OUTPUT_DIRECTORY):
     os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
 
 
-def grid_results_json(problem_name: str, alg_name: str):
-    return f'{OUTPUT_DIRECTORY}/{problem_name}_{alg_name}.json'
+def optimization_grid_table(problem_name: str, alg_name: str):
+    return f'{OUTPUT_DIRECTORY}/{problem_name}_{alg_name}_grid_table.json'
+
+
+def optimization_grid_summary(problem_name: str, alg_name: str):
+    return f'{OUTPUT_DIRECTORY}/{problem_name}_{alg_name}_grid_summary.json'
 
 
 def nn_joblib(optimizer_name: str):

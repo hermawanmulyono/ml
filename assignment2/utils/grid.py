@@ -119,7 +119,7 @@ def _parse_single_results(
     }:
         best_state = np.array(d['best_state'])
         best_fitness = d['best_fitness']
-        fitness_curve = np.ndarray(d['fitness_curve'])
+        fitness_curve = np.array(d['fitness_curve'])
         duration = d['duration']
 
         return OptimizationResults(best_state, best_fitness, fitness_curve,
