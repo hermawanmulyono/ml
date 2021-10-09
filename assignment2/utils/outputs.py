@@ -14,6 +14,12 @@ def optimization_grid_summary(problem_name: str, alg_name: str):
     return f'{OUTPUT_DIRECTORY}/{problem_name}_{alg_name}_grid_summary.json'
 
 
+def optimization_parameter_plot(problem_name: str, alg_name: str,
+                                parameter_name: str, y_axis: str):
+    return f'{OUTPUT_DIRECTORY}/{problem_name}_{alg_name}_' \
+           f'{y_axis}_vs_{parameter_name}.png'
+
+
 def nn_joblib(optimizer_name: str):
     """MLRose neural-network model"""
     return f'{OUTPUT_DIRECTORY}/nn_{optimizer_name}.joblib'

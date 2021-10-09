@@ -4,21 +4,49 @@ import logging
 import multiprocessing
 import os
 import time
-from typing import List, Callable, Tuple, Dict, Any
+from typing import List, Callable, Tuple, Dict, Any, NamedTuple
 
 import numpy as np
-import six
-import sys
 
 from utils.grid import serialize_grid_table, OptimizationResults, \
     MultipleResults, \
     grid_args_generator, parse_grid_table, GridTable, summarize_grid_table, \
     serialize_grid_optimization_summary, GridOptimizationSummary, \
     parse_grid_optimization_summary
-from utils.outputs import optimization_grid_table, optimization_grid_summary
+from utils.outputs import optimization_grid_table, optimization_grid_summary, \
+    optimization_parameter_plot
 
-sys.modules['sklearn.externals.six'] = six
-import mlrose
+import mlrose_hiive as mlrose
+
+from utils.plots import parameter_plot
+
+REPEATS = 24
+
+
+def simulated_annealing_wrapper(problem,
+                                init_temp=1.0,
+                                decay=0.99,
+                                min_temp=0.001,
+                                max_attempts=10,
+                                max_iters=np.inf,
+                                init_state=None,
+                                curve=False,
+                                fevals=False,
+                                random_state=None,
+                                state_fitness_callback=None,
+                                callback_user_info=None):
+    """A wrapper for mlrose.simulated_annealing function
+
+    The arguments are exactly the same, except the schedule
+    has been decomposed into GeomDecay's `init_temp`,
+    `decay`, and `min_temp`.
+
+    """
+    schedule = mlrose.GeomDecay(init_temp, decay, min_temp)
+    return mlrose.simulated_annealing(problem, schedule, max_attempts,
+                                      max_iters, init_state, curve, fevals,
+                                      random_state, state_fitness_callback,
+                                      callback_user_info)
 
 
 def run_single(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable, kwargs: dict):
@@ -29,8 +57,13 @@ def run_single(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable, kwargs: dict):
     end = time.time()
     duration = end - start
 
+    # The second column of fitness_curve is the function_evaluations.
+    # Just take the very last entry. We're not interested in knowing the
+    # function evaluations in every iteration.
+    function_evaluations = int(fitness_curve[-1, -1])
+
     optimization_results = OptimizationResults(best_state, best_fitness,
-                                               fitness_curve, duration)
+                                               function_evaluations, duration)
 
     return optimization_results
 
@@ -139,21 +172,30 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
 
     for problem, problem_name in zip(problems, problem_names):
         # Each problem is solved multiple times with different algorithms
-
+        # and different parameters
         algs_params_tuples = _make_alg_params_tuple(problem)
 
-        for alg, params_grid in algs_params_tuples:
+        # See the AlgorithmExperimentSetup definition about these variables
+        alg: Callable
+        params_grid: Dict[str, Any]
+        alg_plots: List[Tuple[str, str]]
+
+        for alg, params_grid, alg_plots in algs_params_tuples:
             alg_name = alg.__name__
             json_path = optimization_grid_table(f'{problem_name}', alg_name)
 
+            # Only run grid-search if the JSON file doesn't exist
             if not os.path.exists(json_path):
                 logging.info(f'Running {problem_name} {alg_name}')
-                grid_table = grid_run(problem, alg, params_grid, repeats=20)
+                grid_table = grid_run(problem,
+                                      alg,
+                                      params_grid,
+                                      repeats=REPEATS)
                 grid_table_serialized = serialize_grid_table(grid_table)
 
                 # Write results to disk
                 with open(json_path, 'w') as j:
-                    json.dump(grid_table_serialized, j, indent=4)
+                    json.dump(grid_table_serialized, j, indent=2)
 
             with open(json_path, 'r') as j:
                 grid_table_serialized = json.load(j)
@@ -161,13 +203,15 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
             grid_table = parse_grid_table(grid_table_serialized)
             grid_summary = summarize_grid_table(grid_table, 'optimization')
 
-            grid_summary_json_path = optimization_grid_summary(problem_name,
-                                                               alg_name)
+            grid_summary_json_path = optimization_grid_summary(
+                problem_name, alg_name)
+
+            # Only summarize results when the JSON file doesn't exist
             if not os.path.exists(grid_summary_json_path):
                 with open(grid_summary_json_path, 'w') as j:
                     grid_summary_serialized = \
                         serialize_grid_optimization_summary(grid_summary)
-                    json.dump(grid_summary_serialized, j, indent=4)
+                    json.dump(grid_summary_serialized, j, indent=2)
 
             with open(grid_summary_json_path) as j:
                 grid_summary_serialized = json.load(j)
@@ -175,13 +219,50 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
             grid_summary: GridOptimizationSummary = \
                 parse_grid_optimization_summary(grid_summary_serialized)
 
+            sync_optimization_plots(grid_summary, alg_plots, problem_name,
+                                    alg_name)
+
+
+def sync_optimization_plots(grid_summary: GridOptimizationSummary,
+                            alg_plots: List[Tuple[str, str]], problem_name: str,
+                            alg_name: str):
+    for y_axis in ['best_fitness', 'duration']:
+        for param_name, scale in alg_plots:
+            figure_path = optimization_parameter_plot(problem_name, alg_name,
+                                                      param_name, y_axis)
+
+            # Only generate plot if it doesn't exist
+            if os.path.exists(figure_path):
+                continue
+
+            fig = parameter_plot(grid_summary,
+                                 param_name,
+                                 scale,
+                                 y_axis=y_axis)
+
+            fig.write_image(figure_path)
+
+
+class AlgorithmExperimentSetup(NamedTuple):
+    """Algorithm experiment setup
+
+    The members are:
+      - `alg_function`: A function to solve an optimization
+        problem e.g. mlrose.hill_climb, etc.
+      - `param_grid`: Parameter grid in Scikit-Learn style
+      - `plots`: Which parameters to plot, and whether to
+        use linear/log scale `[..., (param_name, s) ,...]`
+        where `s` is either `linear` or `logarithmic`.
+
+    """
+    alg_function: Callable
+    param_grid: Dict[str, Any]
+    plots: List[Tuple[str, str]]
+
 
 def _make_alg_params_tuple(
-        problem: mlrose.DiscreteOpt) -> List[Tuple[Callable, Dict[str, Any]]]:
-    """Helper to create list of alg, param_grid tuples
-
-    The returned list of tuples can be used for grid-search
-    purposes.
+        problem: mlrose.DiscreteOpt) -> List[AlgorithmExperimentSetup]:
+    """Helper to create list of AlgorithmExperimentSetup objects
 
     Args:
         problem: A discrete optimization problem. This must
@@ -189,7 +270,7 @@ def _make_alg_params_tuple(
             function and all the necessary parameters.
 
     Returns:
-        List of tuples [..., (alg_function, param_grid),...]
+        List of AlgorithmExperimentSetup objects
         corresponding to hill climb, simulated annealing,
         genetic algorithm, and MIMIC.
 
@@ -198,12 +279,23 @@ def _make_alg_params_tuple(
 
     # Hill climbing
     hill_climb_param_grid = {'restarts': [0, 10, 50]}
-    algs_params_tuples.append((mlrose.hill_climb, hill_climb_param_grid))
+    hill_climb_plots = [('restarts', 'linear')]
+    algs_params_tuples.append(
+        AlgorithmExperimentSetup(mlrose.hill_climb, hill_climb_param_grid,
+                                 hill_climb_plots))
 
     # Simulated annealing
     vector_length = problem.length
-    sa_param_grid = {'max_attempts': [10, vector_length]}
-    algs_params_tuples.append((mlrose.simulated_annealing, sa_param_grid))
+    sa_param_grid = {
+        'max_attempts': [10, vector_length],
+        'init_temp': [1.0, 10.0, 100.0],
+        'decay': [0.99, 0.999, 0.9999]
+    }
+    sa_plots = [('init_temp', 'logarithmic'), ('decay', 'logarithmic')]
+
+    algs_params_tuples.append(
+        AlgorithmExperimentSetup(simulated_annealing_wrapper, sa_param_grid,
+                                 sa_plots))
 
     # Genetic algorithm
     ga_param_grid = {
@@ -211,7 +303,18 @@ def _make_alg_params_tuple(
         'mutation_prob': np.logspace(-1, -5, 10),
         'max_attempts': [10, vector_length]
     }
-    algs_params_tuples.append((mlrose.genetic_alg, ga_param_grid))
+    ga_plots = [('mutation_prob', 'logarithmic')]
+    algs_params_tuples.append(
+        AlgorithmExperimentSetup(mlrose.genetic_alg, ga_param_grid, ga_plots))
+
+    # MIMIC
+    mimic_param_grid = {
+        'keep_pct': [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
+        'max_attempts': [10, vector_length]
+    }
+    mimic_plots = [('keep_pct', 'linear')]
+    algs_params_tuples.append(
+        AlgorithmExperimentSetup(mlrose.mimic, mimic_param_grid, mimic_plots))
 
     return algs_params_tuples
 

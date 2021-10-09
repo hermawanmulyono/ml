@@ -8,8 +8,6 @@ from typing import Dict, Any, Iterable
 
 import joblib
 import numpy as np
-import six
-import sys
 
 from sklearn.metrics import accuracy_score
 
@@ -19,8 +17,7 @@ from utils.grid import NNResults, MultipleResults, GridTable, \
     GridNNSummary
 from utils.outputs import nn_joblib, nn_grid_table, nn_grid_summary
 
-sys.modules['sklearn.externals.six'] = six
-import mlrose
+import mlrose_hiive as mlrose
 import plotly.express as px
 
 from utils.data import gen_2d_data
@@ -136,8 +133,7 @@ def simulated_annealing(x_train: np.ndarray, y_train: np.ndarray,
 
     param_grid = {
         'algorithm': [algorithm_name],
-        'max_attempts': [10, 100, 1000, 10000],
-        # 'random_state': [1234]
+        'max_attempts': [10, 100, 1000, 10000]
     }
 
     grid_table_json_path = nn_grid_table(algorithm_name)
@@ -148,7 +144,7 @@ def simulated_annealing(x_train: np.ndarray, y_train: np.ndarray,
         grid_table_serialized = serialize_grid_table(grid_table)
 
         with open(grid_table_json_path, 'w') as j:
-            json.dump(grid_table_serialized, j, indent=4)
+            json.dump(grid_table_serialized, j, indent=2)
 
     with open(grid_table_json_path) as j:
         grid_table_serialized = json.load(j)
@@ -160,7 +156,44 @@ def simulated_annealing(x_train: np.ndarray, y_train: np.ndarray,
     if not os.path.exists(grid_summary_json_path):
         with open(grid_summary_json_path, 'w') as j:
             grid_summary_serialized = serialize_grid_nn_summary(grid_summary)
-            json.dump(grid_summary_serialized, j, indent=4)
+            json.dump(grid_summary_serialized, j, indent=2)
+
+    with open(grid_summary_json_path) as j:
+        grid_summary_serialized = json.load(j)
+
+    grid_summary: GridNNSummary = parse_grid_nn_summary(grid_summary_serialized)
+
+
+def hill_climbing(x_train: np.ndarray, y_train: np.ndarray,
+                        x_val: np.ndarray, y_val: np.ndarray, repeats: int):
+    algorithm_name = 'random_hill_climb'
+
+    param_grid = {
+        'algorithm': [algorithm_name],
+        'max_attempts': [10, 100, 1000, 10000]
+    }
+
+    grid_table_json_path = nn_grid_table(algorithm_name)
+
+    if not os.path.exists(grid_table_json_path):
+        grid_table: GridTable = grid_run(x_train, y_train, x_val, y_val,
+                                         param_grid, repeats)
+        grid_table_serialized = serialize_grid_table(grid_table)
+
+        with open(grid_table_json_path, 'w') as j:
+            json.dump(grid_table_serialized, j, indent=2)
+
+    with open(grid_table_json_path) as j:
+        grid_table_serialized = json.load(j)
+
+    grid_table = parse_grid_table(grid_table_serialized)
+    grid_summary = summarize_grid_table(grid_table, 'nn')
+
+    grid_summary_json_path = nn_grid_summary(algorithm_name)
+    if not os.path.exists(grid_summary_json_path):
+        with open(grid_summary_json_path, 'w') as j:
+            grid_summary_serialized = serialize_grid_nn_summary(grid_summary)
+            json.dump(grid_summary_serialized, j, indent=2)
 
     with open(grid_summary_json_path) as j:
         grid_summary_serialized = json.load(j)

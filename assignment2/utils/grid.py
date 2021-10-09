@@ -12,7 +12,7 @@ class OptimizationResults(NamedTuple):
     """Random Optimization Results"""
     best_state: np.ndarray
     best_fitness: float
-    fitness_curve: np.ndarray
+    function_evaluations: int
     duration: float
 
 
@@ -23,6 +23,20 @@ class NNResults(NamedTuple):
 
 
 class Stats(NamedTuple):
+    """Statistics of a scalar
+
+    This is usually used for a repeated experiment.
+
+    The members are:
+      - mean
+      - median
+      - std
+      - q1
+      - q3
+      - min
+      - max
+
+    """
     mean: float
     median: float
     std: float
@@ -33,6 +47,13 @@ class Stats(NamedTuple):
 
 
 class OptimizationSummary(NamedTuple):
+    """Optimization summary
+
+    The members are:
+      - `best_fitness`: The best_fitness statistics
+      - `duration`: Duration statistics
+
+    """
     best_fitness: Stats
     duration: Stats
 
@@ -60,6 +81,16 @@ JSONGridTable = List[Tuple[dict, JSONMultipleResults]]
 
 
 class GridOptimizationSummary(NamedTuple):
+    """Grid optimization summary
+
+    The members are:
+      - `best_fitness`: The best model fitness statistics
+      - `duration`: The best model duration statistics
+      - `kwargs`: The best model kwargs
+      - `table`: The grid table
+        `[..., (kwargs, OptimizationSummary), ...]`
+
+    """
     best_fitness: Stats
     duration: Stats
     kwargs: dict
@@ -74,6 +105,9 @@ class GridNNSummary(NamedTuple):
     table: List[Tuple[dict, NNSummary]]
 
 
+GridSummary = Union[GridOptimizationSummary, GridNNSummary]
+
+
 def _serialize_single_results(
         single_results: Union[OptimizationResults,
                               NNResults]) -> JSONSingleResults:
@@ -84,8 +118,8 @@ def _serialize_single_results(
                 single_results.best_state.astype(int).tolist(),
             'best_fitness':
                 single_results.best_fitness,
-            'fitness_curve':
-                single_results.fitness_curve.astype(float).tolist(),
+            'function_evaluations':
+                single_results.function_evaluations,
             'duration':
                 single_results.duration
         }
@@ -115,14 +149,14 @@ def _parse_single_results(
     """
 
     if set(d.keys()) == {
-            'best_state', 'best_fitness', 'fitness_curve', 'duration'
+            'best_state', 'best_fitness', 'function_evaluations', 'duration'
     }:
         best_state = np.array(d['best_state'])
         best_fitness = d['best_fitness']
-        fitness_curve = np.array(d['fitness_curve'])
+        function_evaluations = np.array(d['function_evaluations'])
         duration = d['duration']
 
-        return OptimizationResults(best_state, best_fitness, fitness_curve,
+        return OptimizationResults(best_state, best_fitness, function_evaluations,
                                    duration)
     elif set(d.keys()) == {'train_accuracy', 'val_accuracy', 'fit_time'}:
         train_accuracy = d['train_accuracy']

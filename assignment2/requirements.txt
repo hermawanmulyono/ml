@@ -1,5 +1,6 @@
 six
-mlrose
+mlrose-hiive
 numpy
 pandas
 plotly
+kaleido
