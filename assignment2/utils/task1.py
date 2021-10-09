@@ -226,7 +226,7 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
 def sync_optimization_plots(grid_summary: GridOptimizationSummary,
                             alg_plots: List[Tuple[str, str]], problem_name: str,
                             alg_name: str):
-    for y_axis in ['best_fitness', 'duration']:
+    for y_axis in ['best_fitness', 'duration', 'function_evaluations']:
         for param_name, scale in alg_plots:
             figure_path = optimization_parameter_plot(problem_name, alg_name,
                                                       param_name, y_axis)

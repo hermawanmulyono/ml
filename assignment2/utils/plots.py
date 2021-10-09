@@ -65,7 +65,7 @@ def parameter_plot(grid_summary: GridSummary, param_name: str, x_scale: str,
 
     fig.update_layout({
         'xaxis_title': param_name,
-        'yaxis_title': 'Accuracy',
+        'yaxis_title': y_axis,
         'width': 640,
         'height': 480
     })
