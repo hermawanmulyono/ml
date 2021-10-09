@@ -31,3 +31,7 @@ def nn_grid_table(algorithm_name: str):
 
 def nn_grid_summary(algorithm_name: str):
     return f'{OUTPUT_DIRECTORY}/nn_{algorithm_name}_grid_summary.json'
+
+
+def nn_parameter_plot(alg_name: str, parameter_name: str, y_axis: str):
+    return f'{OUTPUT_DIRECTORY}/nn_{alg_name}_{y_axis}_vs_{parameter_name}.png'

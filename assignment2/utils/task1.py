@@ -213,6 +213,7 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
                         serialize_grid_optimization_summary(grid_summary)
                     json.dump(grid_summary_serialized, j, indent=2)
 
+            # Check by opening the serialized results
             with open(grid_summary_json_path) as j:
                 grid_summary_serialized = json.load(j)
 

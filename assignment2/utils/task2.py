@@ -4,7 +4,7 @@ import logging
 import multiprocessing
 import os
 import time
-from typing import Dict, Any, Iterable
+from typing import Dict, Any, Iterable, List, Tuple, Union
 
 import joblib
 import numpy as np
@@ -15,12 +15,14 @@ from utils.grid import NNResults, MultipleResults, GridTable, \
     grid_args_generator, summarize_grid_table, serialize_grid_table, \
     parse_grid_table, serialize_grid_nn_summary, parse_grid_nn_summary, \
     GridNNSummary
-from utils.outputs import nn_joblib, nn_grid_table, nn_grid_summary
+from utils.outputs import nn_joblib, nn_grid_table, nn_grid_summary, \
+    nn_parameter_plot
 
 import mlrose_hiive as mlrose
 import plotly.express as px
 
 from utils.data import gen_2d_data
+from utils.plots import parameter_plot
 
 
 def schedule_fn(t, offset: int):
@@ -113,8 +115,8 @@ def run_multiple(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
 
 def grid_run(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
-             y_val: np.ndarray, param_grid: Dict[str,
-                                                 Iterable[Any]], repeats: int):
+             y_val: np.ndarray, param_grid: Dict[str, Union[list, np.ndarray]],
+             repeats: int):
 
     table: GridTable = []
     for kwargs in grid_args_generator(param_grid):
@@ -136,13 +138,17 @@ def simulated_annealing(x_train: np.ndarray, y_train: np.ndarray,
         'max_attempts': [10, 100, 1000, 10000]
     }
 
+    alg_plots = [('max_attempts', 'logarithmic')]
+
     grid_table_json_path = nn_grid_table(algorithm_name)
 
+    # Only run grid search if the JSON file doesn't exist
     if not os.path.exists(grid_table_json_path):
         grid_table: GridTable = grid_run(x_train, y_train, x_val, y_val,
                                          param_grid, repeats)
         grid_table_serialized = serialize_grid_table(grid_table)
 
+        # Write results to disk
         with open(grid_table_json_path, 'w') as j:
             json.dump(grid_table_serialized, j, indent=2)
 
@@ -153,19 +159,42 @@ def simulated_annealing(x_train: np.ndarray, y_train: np.ndarray,
     grid_summary = summarize_grid_table(grid_table, 'nn')
 
     grid_summary_json_path = nn_grid_summary(algorithm_name)
+
+    # Only summarize results when the JSON file doesn't exist
     if not os.path.exists(grid_summary_json_path):
         with open(grid_summary_json_path, 'w') as j:
             grid_summary_serialized = serialize_grid_nn_summary(grid_summary)
             json.dump(grid_summary_serialized, j, indent=2)
 
+    # Check by opening the serialized results
     with open(grid_summary_json_path) as j:
         grid_summary_serialized = json.load(j)
 
     grid_summary: GridNNSummary = parse_grid_nn_summary(grid_summary_serialized)
+    sync_nn_plots(grid_summary, alg_plots=alg_plots, alg_name=algorithm_name)
 
 
-def hill_climbing(x_train: np.ndarray, y_train: np.ndarray,
-                        x_val: np.ndarray, y_val: np.ndarray, repeats: int):
+def _nn_task_template():
+    pass
+
+
+def sync_nn_plots(grid_summary: GridNNSummary, alg_plots: List[Tuple[str, str]],
+                  alg_name: str):
+    for y_axis in ['train_accuracy', 'val_accuracy', 'fit_time']:
+        for param_name, scale in alg_plots:
+            figure_path = nn_parameter_plot(alg_name, param_name, y_axis)
+
+            # Only generate plot if it doesn't exist
+            if os.path.exists(figure_path):
+                continue
+
+            fig = parameter_plot(grid_summary, param_name, scale, y_axis=y_axis)
+
+            fig.write_image(figure_path)
+
+
+def hill_climbing(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
+                  y_val: np.ndarray, repeats: int):
     algorithm_name = 'random_hill_climb'
 
     param_grid = {
