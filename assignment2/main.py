@@ -7,7 +7,7 @@ from utils.task2 import task2
 def main():
     logging.basicConfig(level=logging.INFO)
 
-    task1()
+    # task1()
     task2()
 
 

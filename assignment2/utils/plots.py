@@ -24,16 +24,17 @@ def parameter_plot(grid_summary: GridSummary, param_name: str, x_scale: str,
 
     """
     if x_scale not in ['linear', 'logarithmic']:
-        raise ValueError
+        raise ValueError("x_scale must be either 'linear' or 'logarithmic'.")
 
     best_params = grid_summary.kwargs
     if param_name not in best_params:
-        raise ValueError
+        raise ValueError(f'param_name {param_name} is not one of the '
+                         f'best_params keys {set(best_params.keys())}')
 
     y_axis_valid = hasattr(grid_summary,
                            y_axis) and (y_axis not in {'kwargs', 'table'})
     if not y_axis_valid:
-        raise ValueError
+        raise ValueError('Invalid y_axis')
 
     other_params = {k: v for k, v in best_params.items() if k != param_name}
 

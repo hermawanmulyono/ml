@@ -113,6 +113,8 @@ class GridNNSummary(NamedTuple):
 
 GridSummary = Union[GridOptimizationSummary, GridNNSummary]
 
+ParamGrid = Dict[str, Union[list, np.ndarray]]
+
 
 def _serialize_single_results(
         single_results: Union[OptimizationResults,
@@ -208,7 +210,7 @@ def _increase_grid_index(grid_index_: List[int], param_grid: dict):
     return grid_index_
 
 
-def grid_args_generator(param_grid: Dict[str, Union[list, np.ndarray]]):
+def grid_args_generator(param_grid: ParamGrid):
     """Generates arguments for a grid search
 
     Args:

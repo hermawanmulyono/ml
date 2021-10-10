@@ -14,7 +14,7 @@ from sklearn.metrics import accuracy_score
 from utils.grid import NNResults, MultipleResults, GridTable, \
     grid_args_generator, summarize_grid_table, serialize_grid_table, \
     parse_grid_table, serialize_grid_nn_summary, parse_grid_nn_summary, \
-    GridNNSummary
+    GridNNSummary, ParamGrid
 from utils.outputs import nn_joblib, nn_grid_table, nn_grid_summary, \
     nn_parameter_plot
 
@@ -23,6 +23,42 @@ import plotly.express as px
 
 from utils.data import gen_2d_data
 from utils.plots import parameter_plot
+
+HIDDEN_NODES = [16] * 4
+
+
+def num_trainable_params(hidden_nodes: List[int], n_inputs: int,
+                         n_outputs: int):
+    """Calculate the number of weights in a neural network
+
+    Illustration:
+    https://stats.stackexchange.com/questions/296981/formula-for-number-of-weights-in-neural-network
+
+    Args:
+        hidden_nodes: Hidden nodes definition
+        n_inputs: Number of inputs
+        n_outputs: Number of outputs
+
+    Returns:
+        Number of trainable parameters
+
+    """
+    nodes = [n_inputs] + hidden_nodes + [n_outputs]
+    num_params = 0
+    for i in range(1, len(nodes)):
+        layer_width = nodes[i]
+        prev_layer_width = nodes[i - 1]
+
+        weights = layer_width * prev_layer_width
+        num_bias = layer_width
+
+        num_params += weights
+        num_params += num_bias
+
+    return num_params
+
+
+NN_NUM_PARAMS = num_trainable_params(HIDDEN_NODES, 2, 1)
 
 
 def schedule_fn(t, offset: int):
@@ -77,7 +113,7 @@ def run_single(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     Returns:
 
     """
-    hidden_nodes = [16] * 4
+    hidden_nodes = HIDDEN_NODES
     kwargs = copy.deepcopy(kwargs)
     kwargs['hidden_nodes'] = hidden_nodes
     kwargs['curve'] = True
@@ -135,10 +171,53 @@ def simulated_annealing(x_train: np.ndarray, y_train: np.ndarray,
 
     param_grid = {
         'algorithm': [algorithm_name],
-        'max_attempts': [10, 100, 1000, 10000]
+        'init_temp': [1.0, 10.0, 100.0],
+        'decay': [0.99, 0.999, 0.9999],
+        'learning_rate': [1, 0.1, 0.01, 0.001, 0.001]
     }
 
-    alg_plots = [('max_attempts', 'logarithmic')]
+    alg_plots = [('init_temp', 'logarithmic'), ('decay', 'logarithmic')]
+
+    _nn_task_template(algorithm_name, param_grid, alg_plots, x_train, y_train,
+                      x_val, y_val, repeats)
+
+
+def hill_climbing(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
+                  y_val: np.ndarray, repeats: int):
+    algorithm_name = 'random_hill_climb'
+
+    param_grid = {
+        'algorithm': [algorithm_name],
+        'restarts': [0, 10, 50],
+        'learning_rate': [1, 0.1, 0.01, 0.001, 0.001]
+    }
+
+    alg_plots = [('restarts', 'linear')]
+
+    _nn_task_template(algorithm_name, param_grid, alg_plots, x_train, y_train,
+                      x_val, y_val, repeats)
+
+
+def genetic_algorithm(x_train: np.ndarray, y_train: np.ndarray,
+                      x_val: np.ndarray, y_val: np.ndarray, repeats: int):
+    algorithm_name = 'genetic_algorithm'
+
+    param_grid = {
+        'algorithm': [algorithm_name],
+        'mutation_prob': np.logspace(-1, -5, 5),
+        'learning_rate': [1, 0.1, 0.01, 0.001, 0.001]
+    }
+
+    alg_plots = [('mutation_prob', 'logarithmic')]
+
+    _nn_task_template(algorithm_name, param_grid, alg_plots, x_train, y_train,
+                      x_val, y_val, repeats)
+
+
+def _nn_task_template(algorithm_name: str, param_grid: ParamGrid,
+                      alg_plots: List[Tuple[str, str]], x_train: np.ndarray,
+                      y_train: np.ndarray, x_val: np.ndarray, y_val: np.ndarray,
+                      repeats: int):
 
     grid_table_json_path = nn_grid_table(algorithm_name)
 
@@ -174,10 +253,6 @@ def simulated_annealing(x_train: np.ndarray, y_train: np.ndarray,
     sync_nn_plots(grid_summary, alg_plots=alg_plots, alg_name=algorithm_name)
 
 
-def _nn_task_template():
-    pass
-
-
 def sync_nn_plots(grid_summary: GridNNSummary, alg_plots: List[Tuple[str, str]],
                   alg_name: str):
     for y_axis in ['train_accuracy', 'val_accuracy', 'fit_time']:
@@ -191,43 +266,6 @@ def sync_nn_plots(grid_summary: GridNNSummary, alg_plots: List[Tuple[str, str]],
             fig = parameter_plot(grid_summary, param_name, scale, y_axis=y_axis)
 
             fig.write_image(figure_path)
-
-
-def hill_climbing(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
-                  y_val: np.ndarray, repeats: int):
-    algorithm_name = 'random_hill_climb'
-
-    param_grid = {
-        'algorithm': [algorithm_name],
-        'max_attempts': [10, 100, 1000, 10000]
-    }
-
-    grid_table_json_path = nn_grid_table(algorithm_name)
-
-    if not os.path.exists(grid_table_json_path):
-        grid_table: GridTable = grid_run(x_train, y_train, x_val, y_val,
-                                         param_grid, repeats)
-        grid_table_serialized = serialize_grid_table(grid_table)
-
-        with open(grid_table_json_path, 'w') as j:
-            json.dump(grid_table_serialized, j, indent=2)
-
-    with open(grid_table_json_path) as j:
-        grid_table_serialized = json.load(j)
-
-    grid_table = parse_grid_table(grid_table_serialized)
-    grid_summary = summarize_grid_table(grid_table, 'nn')
-
-    grid_summary_json_path = nn_grid_summary(algorithm_name)
-    if not os.path.exists(grid_summary_json_path):
-        with open(grid_summary_json_path, 'w') as j:
-            grid_summary_serialized = serialize_grid_nn_summary(grid_summary)
-            json.dump(grid_summary_serialized, j, indent=2)
-
-    with open(grid_summary_json_path) as j:
-        grid_summary_serialized = json.load(j)
-
-    grid_summary: GridNNSummary = parse_grid_nn_summary(grid_summary_serialized)
 
 
 def task2():
@@ -251,7 +289,9 @@ def task2():
       3. hill_climb
     '''
 
-    simulated_annealing(x_train, y_train, x_val, y_val, 10)
+    simulated_annealing(x_train, y_train, x_val, y_val, 24)
+    hill_climbing(x_train, y_train, x_val, y_val, 24)
+    genetic_algorithm(x_train, y_train, x_val, y_val, 24)
     exit(0)
 
     hidden_nodes = [16] * 4
