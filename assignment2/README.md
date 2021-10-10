@@ -23,3 +23,9 @@ Hill climbing               | `restarts`                               |
 Simulated annealing         | `max_attempts = length`, (`schedule`?)   |
 Genetic algorithm           | `mutation_prob`, `max_attempts = length` |
 MIMIC                       | `keep_pct=[0.1, ..., 0.9]`               |
+
+# Notes
+
+## MLRose Implementations
+
+### GA

@@ -1,14 +1,14 @@
 import logging
 
-from utils.task1 import task1
-from utils.task2 import task2
+from tasks.optimization import run_optimization
+from tasks.nn_weights import run_nn_weights
 
 
 def main():
     logging.basicConfig(level=logging.INFO)
 
-    # task1()
-    task2()
+    run_optimization()
+    run_nn_weights()
 
 
 if __name__ == '__main__':

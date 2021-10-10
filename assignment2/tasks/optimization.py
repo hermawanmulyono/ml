@@ -1,5 +1,4 @@
 import copy
-import json
 import logging
 import multiprocessing
 import os
@@ -8,11 +7,12 @@ from typing import List, Callable, Tuple, Dict, Any, NamedTuple
 
 import numpy as np
 
-from utils.grid import serialize_grid_table, OptimizationResults, \
+from tasks.base import ExperimentBase
+from utils.grid import OptimizationResults, \
     MultipleResults, \
-    grid_args_generator, parse_grid_table, GridTable, summarize_grid_table, \
+    grid_args_generator, GridTable, summarize_grid_table, \
     serialize_grid_optimization_summary, GridOptimizationSummary, \
-    parse_grid_optimization_summary
+    parse_grid_optimization_summary, GridSummary
 from utils.outputs import optimization_grid_table, optimization_grid_summary, \
     optimization_parameter_plot
 
@@ -21,6 +21,86 @@ import mlrose_hiive as mlrose
 from utils.plots import parameter_plot
 
 REPEATS = 24
+
+
+class AlgorithmExperimentSetup(NamedTuple):
+    """Algorithm experiment setup
+
+    The members are:
+      - `alg_function`: A function to solve an optimization
+        problem e.g. mlrose.hill_climb, etc.
+      - `param_grid`: Parameter grid in Scikit-Learn style
+      - `plots`: Which parameters to plot, and whether to
+        use linear/log scale `[..., (param_name, s) ,...]`
+        where `s` is either `linear` or `logarithmic`.
+
+    """
+    alg_function: Callable
+    param_grid: Dict[str, Any]
+    plots: List[Tuple[str, str]]
+
+
+class OptimizationExperiment(ExperimentBase):
+
+    def __init__(self, problem: mlrose.DiscreteOpt, problem_name: str,
+                 algorithm_setup: AlgorithmExperimentSetup, repeats: int):
+        """Initializes an OptimizationExperiment object
+
+        Args:
+            problem: The problem definition
+            problem_name: Problem unique name, which may
+                include some additional information
+                e.g. problem size.
+            algorithm_setup: An AlgorithmExperimentSetup
+                object.
+            repeats: How many times each set of
+                hyperparameters is run
+
+        """
+        self.problem = problem
+        self.problem_name = problem_name
+
+        self.alg = algorithm_setup.alg_function
+        self.param_grid = algorithm_setup.param_grid
+        self.alg_plots = algorithm_setup.plots
+
+        self.repeats = repeats
+
+    @property
+    def alg_name(self):
+        return self.alg.__name__
+
+    @property
+    def grid_table_json(self) -> str:
+        return optimization_grid_table(self.problem_name, self.alg_name)
+
+    def grid_run(self) -> GridTable:
+        logging.info(f'Running {self.problem_name} {self.alg_name}')
+        grid_table = grid_run(self.problem,
+                              self.alg,
+                              self.param_grid,
+                              self.repeats)
+
+        return grid_table
+
+    def summarize_grid_table(self, grid_table: GridTable):
+        return summarize_grid_table(grid_table, 'optimization')
+
+    @property
+    def grid_summary_json_path(self):
+        return optimization_grid_summary(
+                self.problem_name, self.alg_name)
+
+    def serialize_grid_summary(self, grid_summary: GridSummary) -> Dict[str, Any]:
+        return serialize_grid_optimization_summary(grid_summary)
+
+    def parse_grid_summary(
+            self, grid_summary_serialized: Dict[str, Any]) -> GridSummary:
+        return parse_grid_optimization_summary(grid_summary_serialized)
+
+    def sync_parameter_plots(self, grid_summary: GridSummary):
+        sync_optimization_parameter_plots(grid_summary, self.alg_plots,
+                                          self.problem_name, self.alg_name)
 
 
 def simulated_annealing_wrapper(problem,
@@ -167,6 +247,9 @@ def max_kcolor_task():
     return _task1_template(problems, problem_names)
 
 
+
+
+
 def _task1_template(problems: List[mlrose.DiscreteOpt],
                     problem_names: List[str]):
 
@@ -180,6 +263,12 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
         params_grid: Dict[str, Any]
         alg_plots: List[Tuple[str, str]]
 
+        for alg_setup in algs_params_tuples:
+            experiment = OptimizationExperiment(problem, problem_name,
+                                                alg_setup, REPEATS)
+            experiment.run()
+
+        '''        
         for alg, params_grid, alg_plots in algs_params_tuples:
             alg_name = alg.__name__
             json_path = optimization_grid_table(f'{problem_name}', alg_name)
@@ -220,13 +309,14 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
             grid_summary: GridOptimizationSummary = \
                 parse_grid_optimization_summary(grid_summary_serialized)
 
-            sync_optimization_plots(grid_summary, alg_plots, problem_name,
-                                    alg_name)
+            sync_optimization_parameter_plots(grid_summary, alg_plots,
+                                              problem_name, alg_name)
+        '''
 
 
-def sync_optimization_plots(grid_summary: GridOptimizationSummary,
-                            alg_plots: List[Tuple[str, str]], problem_name: str,
-                            alg_name: str):
+def sync_optimization_parameter_plots(grid_summary: GridOptimizationSummary,
+                                      alg_plots: List[Tuple[str, str]],
+                                      problem_name: str, alg_name: str):
     for y_axis in ['best_fitness', 'duration', 'function_evaluations']:
         for param_name, scale in alg_plots:
             figure_path = optimization_parameter_plot(problem_name, alg_name,
@@ -236,29 +326,18 @@ def sync_optimization_plots(grid_summary: GridOptimizationSummary,
             if os.path.exists(figure_path):
                 continue
 
-            fig = parameter_plot(grid_summary,
-                                 param_name,
-                                 scale,
-                                 y_axis=y_axis)
+            fig = parameter_plot(grid_summary, param_name, scale, y_axis=y_axis)
 
             fig.write_image(figure_path)
 
 
-class AlgorithmExperimentSetup(NamedTuple):
-    """Algorithm experiment setup
+def sync_optimization_problem_size_plots(grid_summary: GridOptimizationSummary):
+    # TODO: Implement this
+    pass
 
-    The members are:
-      - `alg_function`: A function to solve an optimization
-        problem e.g. mlrose.hill_climb, etc.
-      - `param_grid`: Parameter grid in Scikit-Learn style
-      - `plots`: Which parameters to plot, and whether to
-        use linear/log scale `[..., (param_name, s) ,...]`
-        where `s` is either `linear` or `logarithmic`.
 
-    """
-    alg_function: Callable
-    param_grid: Dict[str, Any]
-    plots: List[Tuple[str, str]]
+def sync_optimization_fitness_plots():
+    pass
 
 
 def _make_alg_params_tuple(
@@ -320,7 +399,7 @@ def _make_alg_params_tuple(
     return algs_params_tuples
 
 
-def task1():
+def run_optimization():
     """A task to compare some optimization problems
     """
     onemax_task()

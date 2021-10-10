@@ -4,17 +4,18 @@ import logging
 import multiprocessing
 import os
 import time
-from typing import Dict, Any, Iterable, List, Tuple, Union
+from typing import Dict, Any, List, Tuple, Union
 
 import joblib
 import numpy as np
 
 from sklearn.metrics import accuracy_score
 
+from tasks.base import ExperimentBase
 from utils.grid import NNResults, MultipleResults, GridTable, \
     grid_args_generator, summarize_grid_table, serialize_grid_table, \
     parse_grid_table, serialize_grid_nn_summary, parse_grid_nn_summary, \
-    GridNNSummary, ParamGrid
+    GridNNSummary, ParamGrid, GridSummary
 from utils.outputs import nn_joblib, nn_grid_table, nn_grid_summary, \
     nn_parameter_plot
 
@@ -25,6 +26,51 @@ from utils.data import gen_2d_data
 from utils.plots import parameter_plot
 
 HIDDEN_NODES = [16] * 4
+
+REPEATS = 24
+
+
+class NNExperiment(ExperimentBase):
+
+    def __init__(self, algorithm_name: str, param_grid: ParamGrid,
+                 alg_plots: List[Tuple[str, str]], x_train: np.ndarray,
+                 y_train: np.ndarray, x_val: np.ndarray, y_val: np.ndarray,
+                 repeats: int):
+        self.algorithm_name = algorithm_name
+        self.param_grid = param_grid
+        self.alg_plots = alg_plots
+        self.x_train = x_train
+        self.y_train = y_train
+        self.x_val = x_val
+        self.y_val = y_val
+        self.repeats = repeats
+
+    @property
+    def grid_table_json(self) -> str:
+        return nn_grid_table(self.algorithm_name)
+
+    def grid_run(self) -> GridTable:
+        return grid_run(self.x_train, self.y_train, self.x_val, self.y_val,
+                        self.param_grid, self.repeats)
+
+    def summarize_grid_table(self, grid_table: GridTable):
+        return summarize_grid_table(grid_table, 'nn')
+
+    @property
+    def grid_summary_json_path(self):
+        return nn_grid_summary(self.algorithm_name)
+
+    def serialize_grid_summary(self,
+                               grid_summary: GridSummary) -> Dict[str, Any]:
+        return serialize_grid_nn_summary(grid_summary)
+
+    def parse_grid_summary(
+            self, grid_summary_serialized: Dict[str, Any]) -> GridSummary:
+        return parse_grid_nn_summary(grid_summary_serialized)
+
+    def sync_parameter_plots(self, grid_summary: GridSummary):
+        sync_nn_parameter_plots(grid_summary, self.alg_plots,
+                                self.algorithm_name)
 
 
 def num_trainable_params(hidden_nodes: List[int], n_inputs: int,
@@ -178,8 +224,8 @@ def simulated_annealing(x_train: np.ndarray, y_train: np.ndarray,
 
     alg_plots = [('init_temp', 'logarithmic'), ('decay', 'logarithmic')]
 
-    _nn_task_template(algorithm_name, param_grid, alg_plots, x_train, y_train,
-                      x_val, y_val, repeats)
+    NNExperiment(algorithm_name, param_grid, alg_plots, x_train, y_train, x_val,
+                 y_val, repeats).run()
 
 
 def hill_climbing(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
@@ -194,13 +240,13 @@ def hill_climbing(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
     alg_plots = [('restarts', 'linear')]
 
-    _nn_task_template(algorithm_name, param_grid, alg_plots, x_train, y_train,
-                      x_val, y_val, repeats)
+    NNExperiment(algorithm_name, param_grid, alg_plots, x_train, y_train, x_val,
+                 y_val, repeats).run()
 
 
 def genetic_algorithm(x_train: np.ndarray, y_train: np.ndarray,
                       x_val: np.ndarray, y_val: np.ndarray, repeats: int):
-    algorithm_name = 'genetic_algorithm'
+    algorithm_name = 'genetic_alg'
 
     param_grid = {
         'algorithm': [algorithm_name],
@@ -210,8 +256,8 @@ def genetic_algorithm(x_train: np.ndarray, y_train: np.ndarray,
 
     alg_plots = [('mutation_prob', 'logarithmic')]
 
-    _nn_task_template(algorithm_name, param_grid, alg_plots, x_train, y_train,
-                      x_val, y_val, repeats)
+    NNExperiment(algorithm_name, param_grid, alg_plots, x_train, y_train, x_val,
+                 y_val, repeats).run()
 
 
 def _nn_task_template(algorithm_name: str, param_grid: ParamGrid,
@@ -250,11 +296,13 @@ def _nn_task_template(algorithm_name: str, param_grid: ParamGrid,
         grid_summary_serialized = json.load(j)
 
     grid_summary: GridNNSummary = parse_grid_nn_summary(grid_summary_serialized)
-    sync_nn_plots(grid_summary, alg_plots=alg_plots, alg_name=algorithm_name)
+    sync_nn_parameter_plots(grid_summary,
+                            alg_plots=alg_plots,
+                            alg_name=algorithm_name)
 
 
-def sync_nn_plots(grid_summary: GridNNSummary, alg_plots: List[Tuple[str, str]],
-                  alg_name: str):
+def sync_nn_parameter_plots(grid_summary: GridNNSummary,
+                            alg_plots: List[Tuple[str, str]], alg_name: str):
     for y_axis in ['train_accuracy', 'val_accuracy', 'fit_time']:
         for param_name, scale in alg_plots:
             figure_path = nn_parameter_plot(alg_name, param_name, y_axis)
@@ -268,7 +316,7 @@ def sync_nn_plots(grid_summary: GridNNSummary, alg_plots: List[Tuple[str, str]],
             fig.write_image(figure_path)
 
 
-def task2():
+def run_nn_weights():
     x1_size = 5
     x2_size = 2
     n_train = 5000
