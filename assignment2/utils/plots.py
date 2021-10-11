@@ -75,3 +75,25 @@ def parameter_plot(grid_summary: GridSummary, param_name: str, x_scale: str,
         fig.update_xaxes(type='log')
 
     return fig
+
+
+def fitness_curve_plot(fitness_curve: np.ndarray):
+    """Generates fitness curve plot
+
+    Args:
+        fitness_curve: A 1-D array indicating fitness
+            function of every iteration.
+
+    Returns:
+        A go.Figure object fitness vs iteration.
+
+    """
+    fig = go.Figure()
+    iters = np.arange(1, len(fitness_curve) + 1)
+    fig.add_trace(go.Scatter(x=iters, y=fitness_curve, mode='lines'))
+    fig.update_layout({
+        'xaxis_title': 'Iteration',
+        'yaxis_title': 'Fitness function'
+    })
+    return fig
+

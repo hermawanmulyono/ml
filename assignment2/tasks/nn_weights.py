@@ -17,7 +17,7 @@ from utils.grid import NNResults, MultipleResults, GridTable, \
     parse_grid_table, serialize_grid_nn_summary, parse_grid_nn_summary, \
     GridNNSummary, ParamGrid, GridSummary
 from utils.outputs import nn_joblib, nn_grid_table, nn_grid_summary, \
-    nn_parameter_plot
+    nn_parameter_plot, nn_fitness_vs_iteration_plot
 
 import mlrose_hiive as mlrose
 import plotly.express as px
@@ -27,11 +27,10 @@ from utils.plots import parameter_plot
 
 HIDDEN_NODES = [16] * 4
 
-REPEATS = 24
+REPEATS = 6
 
 
 class NNExperiment(ExperimentBase):
-
     def __init__(self, algorithm_name: str, param_grid: ParamGrid,
                  alg_plots: List[Tuple[str, str]], x_train: np.ndarray,
                  y_train: np.ndarray, x_val: np.ndarray, y_val: np.ndarray,
@@ -71,6 +70,39 @@ class NNExperiment(ExperimentBase):
     def sync_parameter_plots(self, grid_summary: GridSummary):
         sync_nn_parameter_plots(grid_summary, self.alg_plots,
                                 self.algorithm_name)
+
+    @property
+    def plot_hyperparameters(self) -> List[Tuple[str, str]]:
+        return self.alg_plots
+
+    @property
+    def plot_metrics(self) -> List[str]:
+        return ['train_accuracy', 'val_accuracy', 'fit_time',
+                'function_evaluations']
+
+    def hyperparameter_plot_path(self, param_name: str, metric: str):
+        return nn_parameter_plot(self.algorithm_name, param_name, metric)
+
+    def generate_fitness_curve(self, best_kwargs: Dict[str, Any]) -> np.ndarray:
+        hidden_nodes = HIDDEN_NODES
+        kwargs = copy.deepcopy(best_kwargs)
+        kwargs['hidden_nodes'] = hidden_nodes
+        kwargs['curve'] = True
+
+        nn_model = get_nn(**kwargs)
+
+        nn_model.fit(self.x_train, self.y_train)
+
+        fitness_curve = np.array(nn_model.fitness_curve)[:, 0]
+
+        assert len(fitness_curve.shape) == 1, \
+            f'Array of shape {fitness_curve.shape} is not 1-D.'
+
+        return fitness_curve
+
+    @property
+    def fitness_curve_name(self) -> str:
+        return nn_fitness_vs_iteration_plot(self.algorithm_name)
 
 
 def num_trainable_params(hidden_nodes: List[int], n_inputs: int,
@@ -176,7 +208,10 @@ def run_single(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     y_pred = nn_model.predict(x_val)
     val_acc = accuracy_score(y_val, y_pred)
 
-    nn_results = NNResults(train_acc, val_acc, fit_time)
+    fitness_curve = np.array(nn_model.fitness_curve)
+    function_evaluations = int(fitness_curve[-1, -1])
+
+    nn_results = NNResults(train_acc, val_acc, fit_time, function_evaluations)
 
     return nn_results
 
@@ -341,54 +376,3 @@ def run_nn_weights():
     hill_climbing(x_train, y_train, x_val, y_val, 24)
     genetic_algorithm(x_train, y_train, x_val, y_val, 24)
     exit(0)
-
-    hidden_nodes = [16] * 4
-
-    weights = None
-    steps = 0
-
-    logging.info('Training neural network')
-    for i in range(20000):
-        kwargs = {'offset': steps}
-        schedule = mlrose.CustomSchedule(schedule_fn, **kwargs)
-        max_iters = 1
-        nn_model = mlrose.NeuralNetwork(
-            hidden_nodes,
-            algorithm='simulated_annealing',
-            # learning_rate=1e-5,
-            max_iters=max_iters,
-            curve=True,
-            schedule=schedule)
-        nn_model.fit(x_train, y_train, init_weights=weights)
-        steps += max_iters
-        weights = nn_model.fitted_weights
-
-        if i % 100 == 0:
-            y_pred = nn_model.predict(x_train)
-            train_acc = accuracy_score(y_train, y_pred)
-            logging.info(f'Train accuracy: {train_acc}')
-
-            y_pred = nn_model.predict(x_val)
-            val_acc = accuracy_score(y_val, y_pred)
-            logging.info(f'Val accuracy: {val_acc}')
-
-    nn_path = nn_joblib('simulated_annealing')
-    joblib.dump(nn_model, nn_path)
-
-    fitness_curve = nn_model.fitness_curve
-    fig = px.line(x=list(range(len(fitness_curve))), y=fitness_curve)
-    fig.show()
-
-    nn_model = joblib.load(nn_path)
-
-    y_pred = nn_model.predict(x_train)
-    train_acc = accuracy_score(y_train, y_pred)
-    logging.info(f'Train accuracy: {train_acc}')
-
-    y_pred = nn_model.predict(x_val)
-    val_acc = accuracy_score(y_val, y_pred)
-    logging.info(f'Val accuracy: {val_acc}')
-
-    fitness_curve = nn_model.fitness_curve
-    fig = px.line(x=list(range(len(fitness_curve))), y=fitness_curve)
-    fig.show()

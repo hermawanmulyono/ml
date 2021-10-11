@@ -14,13 +14,13 @@ from utils.grid import OptimizationResults, \
     serialize_grid_optimization_summary, GridOptimizationSummary, \
     parse_grid_optimization_summary, GridSummary
 from utils.outputs import optimization_grid_table, optimization_grid_summary, \
-    optimization_parameter_plot
+    optimization_parameter_plot, optimization_fitness_vs_iteration_plot
 
 import mlrose_hiive as mlrose
 
 from utils.plots import parameter_plot
 
-REPEATS = 24
+REPEATS = 6
 
 
 class AlgorithmExperimentSetup(NamedTuple):
@@ -76,9 +76,7 @@ class OptimizationExperiment(ExperimentBase):
 
     def grid_run(self) -> GridTable:
         logging.info(f'Running {self.problem_name} {self.alg_name}')
-        grid_table = grid_run(self.problem,
-                              self.alg,
-                              self.param_grid,
+        grid_table = grid_run(self.problem, self.alg, self.param_grid,
                               self.repeats)
 
         return grid_table
@@ -88,10 +86,10 @@ class OptimizationExperiment(ExperimentBase):
 
     @property
     def grid_summary_json_path(self):
-        return optimization_grid_summary(
-                self.problem_name, self.alg_name)
+        return optimization_grid_summary(self.problem_name, self.alg_name)
 
-    def serialize_grid_summary(self, grid_summary: GridSummary) -> Dict[str, Any]:
+    def serialize_grid_summary(self,
+                               grid_summary: GridSummary) -> Dict[str, Any]:
         return serialize_grid_optimization_summary(grid_summary)
 
     def parse_grid_summary(
@@ -101,6 +99,35 @@ class OptimizationExperiment(ExperimentBase):
     def sync_parameter_plots(self, grid_summary: GridSummary):
         sync_optimization_parameter_plots(grid_summary, self.alg_plots,
                                           self.problem_name, self.alg_name)
+
+    @property
+    def plot_hyperparameters(self) -> List[Tuple[str, str]]:
+        return self.alg_plots
+
+    @property
+    def plot_metrics(self) -> List[str]:
+        return ['best_fitness', 'duration', 'function_evaluations']
+
+    def hyperparameter_plot_path(self, param_name: str, metric: str):
+        return optimization_parameter_plot(self.problem_name, self.alg_name,
+                                           param_name, metric)
+
+    def generate_fitness_curve(self, best_kwargs: Dict[str, Any]) -> np.ndarray:
+        kwargs = copy.deepcopy(best_kwargs)
+        kwargs['curve'] = True
+        best_state, best_fitness, fitness_curves = self.alg(
+            self.problem, **kwargs)
+
+        # Fitness value is the first column.
+        # The second one is the function evaluations
+        fitness_curve = fitness_curves[:, 0]
+
+        return fitness_curve
+
+    @property
+    def fitness_curve_name(self) -> str:
+        return optimization_fitness_vs_iteration_plot(self.problem_name,
+                                                      self.alg_name)
 
 
 def simulated_annealing_wrapper(problem,
@@ -247,9 +274,6 @@ def max_kcolor_task():
     return _task1_template(problems, problem_names)
 
 
-
-
-
 def _task1_template(problems: List[mlrose.DiscreteOpt],
                     problem_names: List[str]):
 
@@ -267,51 +291,6 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
             experiment = OptimizationExperiment(problem, problem_name,
                                                 alg_setup, REPEATS)
             experiment.run()
-
-        '''        
-        for alg, params_grid, alg_plots in algs_params_tuples:
-            alg_name = alg.__name__
-            json_path = optimization_grid_table(f'{problem_name}', alg_name)
-
-            # Only run grid-search if the JSON file doesn't exist
-            if not os.path.exists(json_path):
-                logging.info(f'Running {problem_name} {alg_name}')
-                grid_table = grid_run(problem,
-                                      alg,
-                                      params_grid,
-                                      repeats=REPEATS)
-                grid_table_serialized = serialize_grid_table(grid_table)
-
-                # Write results to disk
-                with open(json_path, 'w') as j:
-                    json.dump(grid_table_serialized, j, indent=2)
-
-            with open(json_path, 'r') as j:
-                grid_table_serialized = json.load(j)
-
-            grid_table = parse_grid_table(grid_table_serialized)
-            grid_summary = summarize_grid_table(grid_table, 'optimization')
-
-            grid_summary_json_path = optimization_grid_summary(
-                problem_name, alg_name)
-
-            # Only summarize results when the JSON file doesn't exist
-            if not os.path.exists(grid_summary_json_path):
-                with open(grid_summary_json_path, 'w') as j:
-                    grid_summary_serialized = \
-                        serialize_grid_optimization_summary(grid_summary)
-                    json.dump(grid_summary_serialized, j, indent=2)
-
-            # Check by opening the serialized results
-            with open(grid_summary_json_path) as j:
-                grid_summary_serialized = json.load(j)
-
-            grid_summary: GridOptimizationSummary = \
-                parse_grid_optimization_summary(grid_summary_serialized)
-
-            sync_optimization_parameter_plots(grid_summary, alg_plots,
-                                              problem_name, alg_name)
-        '''
 
 
 def sync_optimization_parameter_plots(grid_summary: GridOptimizationSummary,
@@ -333,10 +312,6 @@ def sync_optimization_parameter_plots(grid_summary: GridOptimizationSummary,
 
 def sync_optimization_problem_size_plots(grid_summary: GridOptimizationSummary):
     # TODO: Implement this
-    pass
-
-
-def sync_optimization_fitness_plots():
     pass
 
 
@@ -389,12 +364,12 @@ def _make_alg_params_tuple(
 
     # MIMIC
     mimic_param_grid = {
-        'keep_pct': [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
+        'keep_pct': [0.1, 0.2, 0.3, 0.4],
         'max_attempts': [10, vector_length]
     }
     mimic_plots = [('keep_pct', 'linear')]
-    algs_params_tuples.append(
-        AlgorithmExperimentSetup(mlrose.mimic, mimic_param_grid, mimic_plots))
+    # algs_params_tuples.append(
+    #     AlgorithmExperimentSetup(mlrose.mimic, mimic_param_grid, mimic_plots))
 
     return algs_params_tuples
 
