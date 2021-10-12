@@ -20,7 +20,7 @@ import mlrose_hiive as mlrose
 
 from utils.plots import parameter_plot
 
-REPEATS = 6
+REPEATS = 24
 
 
 class AlgorithmExperimentSetup(NamedTuple):
@@ -179,8 +179,14 @@ def run_multiple(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable,
                  kwargs: dict, repeats: int) -> MultipleResults:
 
     def args_generator():
+        start = time.time()
+
         for _ in range(repeats):
             yield problem_fit, alg_fn, kwargs
+
+            if time.time() - start > 600:
+                # Break after 10 minutes
+                break
 
     n_cpus = multiprocessing.cpu_count()
     with multiprocessing.Pool(n_cpus) as pool:
@@ -204,7 +210,7 @@ def grid_run(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable,
 
 def onemax_task():
     fitness = mlrose.OneMax()
-    vector_lengths = [20, 100, 500]
+    vector_lengths = [20, 60, 100, 140]
     problems = [
         mlrose.DiscreteOpt(length=length, fitness_fn=fitness, maximize=True)
         for length in vector_lengths
@@ -215,8 +221,8 @@ def onemax_task():
 
 
 def fourpeaks_task():
-    fitness = mlrose.FourPeaks()
-    vector_lengths = [20, 100, 500]
+    fitness = mlrose.FourPeaks(t_pct=0.4)
+    vector_lengths = [20, 40, 60, 80]
     problems = [
         mlrose.DiscreteOpt(length=length, fitness_fn=fitness, maximize=True)
         for length in vector_lengths
@@ -331,18 +337,18 @@ def _make_alg_params_tuple(
 
     """
     algs_params_tuples = []
+    vector_length = problem.length
 
     # Hill climbing
-    hill_climb_param_grid = {'restarts': [0, 10, 50]}
+    hill_climb_param_grid = {'restarts': [0, 10, 50, 250]}
     hill_climb_plots = [('restarts', 'linear')]
     algs_params_tuples.append(
         AlgorithmExperimentSetup(mlrose.hill_climb, hill_climb_param_grid,
                                  hill_climb_plots))
 
     # Simulated annealing
-    vector_length = problem.length
     sa_param_grid = {
-        'max_attempts': [10, vector_length],
+        'max_attempts': [vector_length],
         'init_temp': [1.0, 10.0, 100.0],
         'decay': [0.99, 0.999, 0.9999]
     }
@@ -354,9 +360,9 @@ def _make_alg_params_tuple(
 
     # Genetic algorithm
     ga_param_grid = {
-        'pop_size': [200],
-        'mutation_prob': np.logspace(-1, -5, 10),
-        'max_attempts': [10, vector_length]
+        'pop_size': [200, 800, 1400, 2000],
+        'mutation_prob': 0.5 * np.logspace(0, -3, 5),
+        'max_attempts': [vector_length]
     }
     ga_plots = [('mutation_prob', 'logarithmic')]
     algs_params_tuples.append(
