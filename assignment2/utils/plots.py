@@ -97,3 +97,29 @@ def fitness_curve_plot(fitness_curve: np.ndarray):
     })
     return fig
 
+
+def box_plot():
+    """This is an example of displaying a box plot.
+
+    Still need to figure out how to display summary
+    across algorithms and problem sizes.
+    """
+    fig = go.Figure()
+    fig.add_trace(
+        go.Box(median=(62.0,),
+               q1=(60,),
+               q3=(68.75,),
+               lowerfence=(58,),
+               upperfence=(71,),
+               name='first',
+               x=(-1,)))
+    fig.add_trace(
+        go.Box(median=(60.0,),
+               q1=(58,),
+               q3=(66.75,),
+               lowerfence=(54,),
+               upperfence=(70,),
+               name='second',
+               x=(1,)))
+    fig.show()
+    pass
