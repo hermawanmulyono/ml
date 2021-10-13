@@ -25,6 +25,12 @@ def optimization_fitness_vs_iteration_plot(problem_name: str, alg_name: str):
            f'{alg_name}_fitness_vs_iteration.png'
 
 
+def optimization_alg_vs_problem_size(general_problem_name: str, alg_name: str,
+                                     metric: str):
+    return f'{OUTPUT_DIRECTORY}/{general_problem_name}_{alg_name}_' \
+           f'{metric}_vs_problem_size.png'
+
+
 def nn_joblib(optimizer_name: str):
     """MLRose neural-network model"""
     return f'{OUTPUT_DIRECTORY}/nn_{optimizer_name}.joblib'
@@ -44,4 +50,3 @@ def nn_parameter_plot(alg_name: str, parameter_name: str, y_axis: str):
 
 def nn_fitness_vs_iteration_plot(algorithm_name: str):
     return f'{OUTPUT_DIRECTORY}/nn_{algorithm_name}_fitness_vs_iteration.png'
-

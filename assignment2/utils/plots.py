@@ -1,3 +1,5 @@
+from typing import List
+
 import numpy as np
 import plotly.graph_objects as go
 
@@ -122,4 +124,39 @@ def box_plot():
                name='second',
                x=(1,)))
     fig.show()
-    pass
+
+
+def alg_vs_problem_size_plot(problem_names: List[str],
+                             summaries: List[OptimizationSummary], metric: str):
+
+    if len(problem_names) != len(summaries):
+        raise ValueError('problem_names and summaries must have the same '
+                         'length')
+
+    if not OptimizationSummary._fields:
+        raise ValueError('metric is not a valid OptimizationSummary attribute')
+
+    medians = [getattr(s, metric).median for s in summaries]
+    q1s = [getattr(s, metric).q1 for s in summaries]
+    q3s = [getattr(s, metric).q3 for s in summaries]
+    mins = [getattr(s, metric).min for s in summaries]
+    maxes = [getattr(s, metric).max for s in summaries]
+    x = list(range(len(problem_names)))
+
+    fig = go.Figure()
+    fig.add_trace(
+        go.Box(median=medians,
+               q1=q1s,
+               q3=q3s,
+               lowerfence=mins,
+               upperfence=maxes,
+               x=x))
+
+    fig.update_xaxes(
+        ticktext=problem_names,
+        tickvals=x,
+    )
+
+    fig.update_layout({'yaxis_title': metric, 'width': 640, 'height': 480})
+
+    return fig

@@ -1,4 +1,5 @@
 import copy
+import json
 import logging
 import multiprocessing
 import os
@@ -12,15 +13,16 @@ from utils.grid import OptimizationResults, \
     MultipleResults, \
     grid_args_generator, GridTable, summarize_grid_table, \
     serialize_grid_optimization_summary, GridOptimizationSummary, \
-    parse_grid_optimization_summary, GridSummary
+    parse_grid_optimization_summary, GridSummary, OptimizationSummary
 from utils.outputs import optimization_grid_table, optimization_grid_summary, \
-    optimization_parameter_plot, optimization_fitness_vs_iteration_plot
+    optimization_parameter_plot, optimization_fitness_vs_iteration_plot, \
+    optimization_alg_vs_problem_size
 
 import mlrose_hiive as mlrose
 
-from utils.plots import parameter_plot
+from utils.plots import parameter_plot, alg_vs_problem_size_plot
 
-REPEATS = 24
+REPEATS = 6
 
 
 class AlgorithmExperimentSetup(NamedTuple):
@@ -265,7 +267,7 @@ def maxkcolor_edges(num_vertices: int, num_edges: int):
 
 
 def max_kcolor_task():
-    vert_edge_pairs = [(30, 20), (60, 40), (90, 60)]
+    vert_edge_pairs = [(30, 20), (45, 30), (60, 40)]
 
     problems = []
     problem_names = []
@@ -280,10 +282,19 @@ def max_kcolor_task():
     return _task1_template(problems, problem_names)
 
 
+ProblemSizePlotsData = Dict[str, List[Tuple[str, OptimizationSummary]]]
+
+
 def _task1_template(problems: List[mlrose.DiscreteOpt],
                     problem_names: List[str]):
 
+    # problem_size_plots_data[alg_name] = [..., summary ,...]
+    problem_size_plots_data: ProblemSizePlotsData = {}
+
     for problem, problem_name in zip(problems, problem_names):
+        if 'maxkcolor' in problem_name:
+            continue
+
         # Each problem is solved multiple times with different algorithms
         # and different parameters
         algs_params_tuples = _make_alg_params_tuple(problem)
@@ -297,6 +308,78 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
             experiment = OptimizationExperiment(problem, problem_name,
                                                 alg_setup, REPEATS)
             experiment.run()
+
+            # Collect data for problem_size_plots_data
+            grid_summary_json_path = experiment.grid_summary_json_path
+            with open(grid_summary_json_path) as j:
+                grid_summary_serialized = json.load(j)
+
+            grid_summary: GridOptimizationSummary = \
+                parse_grid_optimization_summary(grid_summary_serialized)
+
+            best_model_summary = OptimizationSummary(
+                grid_summary.best_fitness, grid_summary.duration,
+                grid_summary.function_evaluations)
+
+            alg_name = experiment.alg_name
+            if alg_name not in problem_size_plots_data:
+                problem_size_plots_data[alg_name] = []
+
+            problem_size_plots_data[alg_name].append(
+                (problem_name, best_model_summary))
+
+    sync_alg_vs_problem_size_plots(problem_size_plots_data)
+
+
+def sync_alg_vs_problem_size_plots(problem_size_plots_data: ProblemSizePlotsData):
+    for alg_name, plot_data in problem_size_plots_data.items():
+        problem_names: List[str]
+        summaries: List[OptimizationSummary]
+        problem_names, summaries = zip(*plot_data)
+
+        general_problem_name = _infer_general_problem_name(problem_names)
+
+        for metric in OptimizationSummary._fields:
+
+            figure_path = optimization_alg_vs_problem_size(
+                general_problem_name,
+                alg_name,
+                metric
+            )
+
+            if os.path.exists(figure_path):
+                continue
+
+            fig = alg_vs_problem_size_plot(problem_names, summaries,
+                                           metric)
+            fig.write_image(figure_path)
+
+
+def _infer_general_problem_name(problem_names: List[str]):
+    """Infers general problem name from the specific ones
+
+    For example, `[onemax_20, onemax_40, onemax_60]` will
+    return `onemax`.
+
+    Args:
+        problem_names: A list of problem names with format
+            `general_more_info`.
+
+    Returns:
+        The general problem name
+
+    """
+
+    if not problem_names:
+        raise ValueError('problem_names must not be empty')
+
+    general_name = problem_names[0].split('_')[0]
+
+    if any([not n.startswith(general_name) for n in problem_names]):
+        raise ValueError('All problem names must start with the same general '
+                         'name.')
+
+    return general_name
 
 
 def sync_optimization_parameter_plots(grid_summary: GridOptimizationSummary,
