@@ -9,6 +9,7 @@ from typing import List, Callable, Tuple, Dict, Any, NamedTuple
 import numpy as np
 
 from tasks.base import ExperimentBase
+from utils.data import temp_seed
 from utils.grid import OptimizationResults, \
     MultipleResults, \
     grid_args_generator, GridTable, summarize_grid_table, \
@@ -22,7 +23,7 @@ import mlrose_hiive as mlrose
 
 from utils.plots import parameter_plot, alg_vs_problem_size_plot
 
-REPEATS = 6
+REPEATS = 12
 
 
 class AlgorithmExperimentSetup(NamedTuple):
@@ -108,7 +109,8 @@ class OptimizationExperiment(ExperimentBase):
 
     @property
     def plot_metrics(self) -> List[str]:
-        return ['best_fitness', 'duration', 'function_evaluations']
+        return ['best_fitness', 'duration', 'function_evaluations',
+                'iterations']
 
     def hyperparameter_plot_path(self, param_name: str, metric: str):
         return optimization_parameter_plot(self.problem_name, self.alg_name,
@@ -170,9 +172,11 @@ def run_single(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable, kwargs: dict):
     # Just take the very last entry. We're not interested in knowing the
     # function evaluations in every iteration.
     function_evaluations = int(fitness_curve[-1, -1])
+    iterations = len(fitness_curve)
 
     optimization_results = OptimizationResults(best_state, best_fitness,
-                                               function_evaluations, duration)
+                                               function_evaluations, duration,
+                                               iterations)
 
     return optimization_results
 
@@ -254,14 +258,15 @@ def maxkcolor_edges(num_vertices: int, num_edges: int):
         raise ValueError
 
     edges = set()
-    while len(edges) < num_edges:
-        v1 = np.random.randint(0, num_vertices)
-        v2 = v1
-        while v2 == v1:
-            v2 = np.random.randint(0, num_vertices)
+    with temp_seed(1234):
+        while len(edges) < num_edges:
+            v1 = np.random.randint(0, num_vertices)
+            v2 = v1
+            while v2 == v1:
+                v2 = np.random.randint(0, num_vertices)
 
-        if ((v1, v2) not in edges) and ((v2, v1) not in edges):
-            edges.add((v1, v2))
+            if ((v1, v2) not in edges) and ((v2, v1) not in edges):
+                edges.add((v1, v2))
 
     return list(edges)
 
@@ -319,7 +324,7 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
 
             best_model_summary = OptimizationSummary(
                 grid_summary.best_fitness, grid_summary.duration,
-                grid_summary.function_evaluations)
+                grid_summary.function_evaluations, grid_summary.iterations)
 
             alg_name = experiment.alg_name
             if alg_name not in problem_size_plots_data:
@@ -385,7 +390,7 @@ def _infer_general_problem_name(problem_names: List[str]):
 def sync_optimization_parameter_plots(grid_summary: GridOptimizationSummary,
                                       alg_plots: List[Tuple[str, str]],
                                       problem_name: str, alg_name: str):
-    for y_axis in ['best_fitness', 'duration', 'function_evaluations']:
+    for y_axis in OptimizationSummary._fields:
         for param_name, scale in alg_plots:
             figure_path = optimization_parameter_plot(problem_name, alg_name,
                                                       param_name, y_axis)
@@ -397,11 +402,6 @@ def sync_optimization_parameter_plots(grid_summary: GridOptimizationSummary,
             fig = parameter_plot(grid_summary, param_name, scale, y_axis=y_axis)
 
             fig.write_image(figure_path)
-
-
-def sync_optimization_problem_size_plots(grid_summary: GridOptimizationSummary):
-    # TODO: Implement this
-    pass
 
 
 def _make_alg_params_tuple(

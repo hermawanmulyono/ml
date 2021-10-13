@@ -20,14 +20,13 @@ from utils.outputs import nn_joblib, nn_grid_table, nn_grid_summary, \
     nn_parameter_plot, nn_fitness_vs_iteration_plot
 
 import mlrose_hiive as mlrose
-import plotly.express as px
 
 from utils.data import gen_2d_data
 from utils.plots import parameter_plot
 
 HIDDEN_NODES = [16] * 4
 
-REPEATS = 6
+REPEATS = 12
 
 
 class NNExperiment(ExperimentBase):
@@ -78,7 +77,7 @@ class NNExperiment(ExperimentBase):
     @property
     def plot_metrics(self) -> List[str]:
         return ['train_accuracy', 'val_accuracy', 'fit_time',
-                'function_evaluations']
+                'function_evaluations', 'iterations']
 
     def hyperparameter_plot_path(self, param_name: str, metric: str):
         return nn_parameter_plot(self.algorithm_name, param_name, metric)
@@ -211,7 +210,10 @@ def run_single(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     fitness_curve = np.array(nn_model.fitness_curve)
     function_evaluations = int(fitness_curve[-1, -1])
 
-    nn_results = NNResults(train_acc, val_acc, fit_time, function_evaluations)
+    iterations = len(fitness_curve)
+
+    nn_results = NNResults(train_acc, val_acc, fit_time, function_evaluations,
+                           iterations)
 
     return nn_results
 
@@ -287,6 +289,21 @@ def genetic_algorithm(x_train: np.ndarray, y_train: np.ndarray,
         'algorithm': [algorithm_name],
         'mutation_prob': np.logspace(-1, -5, 5),
         'learning_rate': [1, 0.1, 0.01, 0.001, 0.001]
+    }
+
+    alg_plots = [('mutation_prob', 'logarithmic')]
+
+    NNExperiment(algorithm_name, param_grid, alg_plots, x_train, y_train, x_val,
+                 y_val, repeats).run()
+
+
+def gradient_descent(x_train: np.ndarray, y_train: np.ndarray,
+                     x_val: np.ndarray, y_val: np.ndarray, repeats: int):
+    algorithm_name = 'gradient_descent'
+
+    param_grid = {
+        'algorithm': [algorithm_name],
+        'learning_rate': np.logspace(-4, -6, 5)
     }
 
     alg_plots = [('mutation_prob', 'logarithmic')]

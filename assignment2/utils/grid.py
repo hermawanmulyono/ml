@@ -9,18 +9,44 @@ import numpy as np
 
 
 class OptimizationResults(NamedTuple):
-    """Random Optimization Results"""
+    """Random Optimization Results
+
+    This data structure corresponds to a single run.
+
+    The members are:
+      - `best_state`: The best state
+      - `best_fitness`: best fitness function the algorithm
+        can achieve
+      - `function_evaluations`: The number of function
+        evaluations during optimization
+      - `iterations`: The number of iterations
+    """
     best_state: np.ndarray
     best_fitness: float
     function_evaluations: int
     duration: float
+    iterations: int
 
 
 class NNResults(NamedTuple):
+    """Neural network results
+
+    This data structure corresponds to a single run.
+
+    The members are:
+      - `train_accuracy`: Training set accuracy
+      - `val_accuracy`: Validation set accuracy
+      - `fit_time`: The fit time
+      - `function_evaluations`: The number of function
+        evaluations
+      - `iterations`: The number of iterations
+
+    """
     train_accuracy: float
     val_accuracy: float
     fit_time: float
     function_evaluations: int
+    iterations: int
 
 
 class Stats(NamedTuple):
@@ -55,11 +81,13 @@ class OptimizationSummary(NamedTuple):
       - `duration`: Duration statistics
       - `function_evaluations`: Function evaluations
         statistics
+      - `iterations`: Number of iterations statistics
 
     """
     best_fitness: Stats
     duration: Stats
     function_evaluations: Stats
+    iterations: Stats
 
 
 class NNSummary(NamedTuple):
@@ -67,6 +95,7 @@ class NNSummary(NamedTuple):
     val_accuracy: Stats
     fit_time: Stats
     function_evaluations: Stats
+    iterations: Stats
 
 
 # JSON-serializable single results
@@ -93,6 +122,8 @@ class GridOptimizationSummary(NamedTuple):
       - `duration`: The best model duration statistics
       - `function_evaluations`: The best model number of
         function evaluations statistics
+      - `iterations`: The best model number of iterations
+        statistics
       - `kwargs`: The best model kwargs
       - `table`: The grid table
         `[..., (kwargs, OptimizationSummary), ...]`
@@ -101,6 +132,7 @@ class GridOptimizationSummary(NamedTuple):
     best_fitness: Stats
     duration: Stats
     function_evaluations: Stats
+    iterations: Stats
     kwargs: dict
     table: List[Tuple[dict, OptimizationSummary]]
 
@@ -110,6 +142,7 @@ class GridNNSummary(NamedTuple):
     val_accuracy: Stats
     fit_time: Stats
     function_evaluations: Stats
+    iterations: Stats
     kwargs: dict
     table: List[Tuple[dict, NNSummary]]
 
@@ -124,20 +157,17 @@ def _serialize_single_results(
                               NNResults]) -> JSONSingleResults:
 
     if type(single_results) == OptimizationResults:
+
         s = {
-            'best_state': single_results.best_state.astype(int).tolist(),
-            'best_fitness': single_results.best_fitness,
-            'function_evaluations': single_results.function_evaluations,
-            'duration': single_results.duration
+            key: getattr(single_results, key)
+            for key in OptimizationResults._fields
         }
+        s['best_state'] = s['best_state'].astype(int).tolist()
+
         return s
     elif type(single_results) == NNResults:
-        s = {
-            'train_accuracy': single_results.train_accuracy,
-            'val_accuracy': single_results.val_accuracy,
-            'fit_time': single_results.fit_time,
-            'function_evaluations': single_results.function_evaluations
-        }
+        s = {key: getattr(single_results, key) for key in NNResults._fields}
+
         return s
     else:
         raise NotImplementedError
@@ -156,23 +186,12 @@ def _parse_single_results(
 
     """
 
-    if set(d.keys()) == {
-            'best_state', 'best_fitness', 'function_evaluations', 'duration'
-    }:
-        best_state = np.array(d['best_state'])
-        best_fitness = d['best_fitness']
-        function_evaluations = d['function_evaluations']
-        duration = d['duration']
-
-        return OptimizationResults(best_state, best_fitness,
-                                   function_evaluations, duration)
-    elif set(d.keys()) == {'train_accuracy', 'val_accuracy', 'fit_time', 'function_evaluations'}:
-        train_accuracy = d['train_accuracy']
-        val_accuracy = d['val_accuracy']
-        fit_time = d['fit_time']
-        function_evaluations = d['function_evaluations']
-
-        return NNResults(train_accuracy, val_accuracy, fit_time, function_evaluations)
+    if set(d.keys()) == set(OptimizationResults._fields):
+        d = copy.deepcopy(d)
+        d['best_state'] = np.array(d['best_state'])
+        return OptimizationResults(**d)
+    elif set(d.keys()) == set(NNResults._fields):
+        return NNResults(**d)
     else:
         raise NotImplementedError
 
@@ -283,8 +302,12 @@ def _summarize_multiple_results(multiple_results: MultipleResults,
             [m.function_evaluations for m in multiple_results])
         function_evaluations_stats = _array_stats(function_evaluations)
 
+        iterations = np.array(
+            [m.iterations for m in multiple_results])
+        iterations_stats = _array_stats(iterations)
+
         return OptimizationSummary(best_fitness_stats, duration_stats,
-                                   function_evaluations_stats)
+                                   function_evaluations_stats, iterations_stats)
 
     elif problem == 'nn':
         train_accuracy = np.array([m.train_accuracy for m in multiple_results])
@@ -296,11 +319,17 @@ def _summarize_multiple_results(multiple_results: MultipleResults,
         fit_time = np.array([m.fit_time for m in multiple_results])
         fit_time_stats = _array_stats(fit_time)
 
-        function_evaluations = np.array([m.function_evaluations for m in multiple_results])
+        function_evaluations = np.array(
+            [m.function_evaluations for m in multiple_results])
         function_evaluations_stats = _array_stats(function_evaluations)
 
+        iterations = np.array(
+            [m.iterations for m in multiple_results])
+        iterations_stats = _array_stats(iterations)
+
         return NNSummary(train_accuracy_stats, val_accuracy_stats,
-                         fit_time_stats, function_evaluations_stats)
+                         fit_time_stats, function_evaluations_stats,
+                         iterations_stats)
 
     else:
         raise NotImplementedError
@@ -334,12 +363,15 @@ def summarize_grid_table(grid_table: GridTable, problem: str):
         summary: NNSummary
         return GridNNSummary(summary.train_accuracy, summary.val_accuracy,
                              summary.fit_time, summary.function_evaluations,
+                             summary.iterations,
                              kwargs, summary_table)
 
     elif problem == 'optimization':
         summary: OptimizationSummary
         return GridOptimizationSummary(summary.best_fitness, summary.duration,
-                                       summary.function_evaluations, kwargs,
+                                       summary.function_evaluations,
+                                       summary.iterations,
+                                       kwargs,
                                        summary_table)
 
     else:
@@ -357,45 +389,29 @@ def _parse_stats(d: Dict[str, Any]):
 
 def _serialize_summary(summary: Union[NNSummary, OptimizationSummary]):
     if type(summary) == NNSummary:
-        summary: NNSummary
-        return {
-            'train_accuracy': _serialize_stats(summary.train_accuracy),
-            'val_accuracy': _serialize_stats(summary.val_accuracy),
-            'fit_time': _serialize_stats(summary.fit_time),
-            'function_evaluations': _serialize_stats(summary.function_evaluations)
+        d = {
+            key: _serialize_stats(getattr(summary, key))
+            for key in NNSummary._fields
         }
     elif type(summary) == OptimizationSummary:
-        summary: OptimizationSummary
-        return {
-            'best_fitness':
-                _serialize_stats(summary.best_fitness),
-            'duration':
-                _serialize_stats(summary.duration),
-            'function_evaluations':
-                _serialize_stats(summary.function_evaluations)
+        d = {
+            key: _serialize_stats(getattr(summary, key))
+            for key in OptimizationSummary._fields
         }
     else:
         raise NotImplementedError
 
+    return d
+
 
 def _parse_summary(d: Dict[str, Any]):
     keys = set(d.keys())
+    d = {key: _parse_stats(d[key]) for key in keys}
 
-    if keys == {'train_accuracy', 'val_accuracy', 'fit_time'}:
-        train_accuracy = _parse_stats(d['train_accuracy'])
-        val_accuracy = _parse_stats(d['val_accuracy'])
-        fit_time = _parse_stats(d['fit_time'])
-        function_evaluations = _parse_stats(d['function_evaluations'])
-
-        return NNSummary(train_accuracy, val_accuracy, fit_time, function_evaluations)
-
-    elif keys == {'best_fitness', 'duration', 'function_evaluations'}:
-        best_fitness = _parse_stats(d['best_fitness'])
-        duration = _parse_stats(d['duration'])
-        function_evaluations = _parse_stats(d['function_evaluations'])
-
-        return OptimizationSummary(best_fitness, duration, function_evaluations)
-
+    if keys == set(NNSummary._fields):
+        return NNSummary(**d)
+    elif keys == set(OptimizationSummary._fields):
+        return OptimizationSummary(**d)
     else:
         raise NotImplementedError
 
@@ -424,6 +440,8 @@ def serialize_grid_nn_summary(grid_nn_summary: GridNNSummary):
     train_accuracy = _serialize_stats(grid_nn_summary.train_accuracy)
     val_accuracy = _serialize_stats(grid_nn_summary.val_accuracy)
     fit_time = _serialize_stats(grid_nn_summary.fit_time)
+    function_evaluations = _serialize_stats(grid_nn_summary.function_evaluations)
+    iterations = _serialize_stats(grid_nn_summary.iterations)
     kwargs = grid_nn_summary.kwargs
     table = _serialize_summary_table(grid_nn_summary.table)
 
@@ -431,6 +449,8 @@ def serialize_grid_nn_summary(grid_nn_summary: GridNNSummary):
         'train_accuracy': train_accuracy,
         'val_accuracy': val_accuracy,
         'fit_time': fit_time,
+        'function_evaluations': function_evaluations,
+        'iterations': iterations,
         'kwargs': kwargs,
         'table': table
     }
@@ -440,9 +460,13 @@ def parse_grid_nn_summary(d: Dict[str, Any]):
     train_accuracy = _parse_stats(d['train_accuracy'])
     val_accuracy = _parse_stats(d['val_accuracy'])
     fit_time = _parse_stats(d['fit_time'])
+    function_evaluations = _parse_stats(d['function_evaluations'])
+    iterations = _parse_stats(d['iterations'])
     kwargs = d['kwargs']
     table = _parse_summary_table(d['table'])
-    return GridNNSummary(train_accuracy, val_accuracy, fit_time, kwargs, table)
+    return GridNNSummary(train_accuracy, val_accuracy, fit_time,
+                         function_evaluations, iterations,
+                         kwargs, table)
 
 
 def serialize_grid_optimization_summary(
@@ -451,6 +475,8 @@ def serialize_grid_optimization_summary(
     duration = _serialize_stats(grid_opt_summary.duration)
     function_evaluations = _serialize_stats(
         grid_opt_summary.function_evaluations)
+    iterations = _serialize_stats(
+        grid_opt_summary.iterations)
     kwargs = grid_opt_summary.kwargs
     table = _serialize_summary_table(grid_opt_summary.table)
 
@@ -458,6 +484,7 @@ def serialize_grid_optimization_summary(
         'best_fitness': best_fitness,
         'duration': duration,
         'function_evaluations': function_evaluations,
+        'iterations': iterations,
         'kwargs': kwargs,
         'table': table
     }
@@ -467,7 +494,10 @@ def parse_grid_optimization_summary(d: Dict[str, Any]):
     best_fitness = _parse_stats(d['best_fitness'])
     duration = _parse_stats(d['duration'])
     function_evaluations = _parse_stats(d['function_evaluations'])
+    iterations = _parse_stats(d['iterations'])
     kwargs = d['kwargs']
     table = _parse_summary_table(d['table'])
+
     return GridOptimizationSummary(best_fitness, duration, function_evaluations,
+                                   iterations,
                                    kwargs, table)
