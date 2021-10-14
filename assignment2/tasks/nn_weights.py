@@ -208,7 +208,13 @@ def run_single(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     val_acc = accuracy_score(y_val, y_pred)
 
     fitness_curve = np.array(nn_model.fitness_curve)
-    function_evaluations = int(fitness_curve[-1, -1])
+    if len(fitness_curve.shape) == 2:
+        function_evaluations = int(fitness_curve[-1, -1])
+    else:
+        # This is only for gradient_descent. The number of function evaluations
+        # is equal to the number of epochs
+        assert kwargs['algorithm'] == 'gradient_descent'
+        function_evaluations = len(fitness_curve)
 
     iterations = len(fitness_curve)
 
@@ -306,7 +312,7 @@ def gradient_descent(x_train: np.ndarray, y_train: np.ndarray,
         'learning_rate': np.logspace(-4, -6, 5)
     }
 
-    alg_plots = [('mutation_prob', 'logarithmic')]
+    alg_plots = [('learning_rate', 'logarithmic')]
 
     NNExperiment(algorithm_name, param_grid, alg_plots, x_train, y_train, x_val,
                  y_val, repeats).run()
@@ -382,6 +388,62 @@ def run_nn_weights():
     assert len(x_train) == len(y_train) == n_train
     assert len(x_val) == len(y_val) == n_val
     assert len(x_test) == len(y_test) == n_test
+
+    # kwargs = {'algorithm': 'random_hill_climb', 'max_iters': 25000,
+    #           'learning_rate': 1e-1}
+    kwargs = {'algorithm': 'genetic_alg', 'max_iters': 1500}
+    # kwargs = {'algorithm': 'gradient_descent', 'learning_rate': 1e-5,
+    #           'max_iters': 7000}
+
+    hidden_nodes = HIDDEN_NODES
+    kwargs = copy.deepcopy(kwargs)
+    kwargs['hidden_nodes'] = hidden_nodes
+    kwargs['curve'] = True
+    nn_model = get_nn(**kwargs)
+
+    start = time.time()
+    nn_model.fit(x_train, y_train)
+    end = time.time()
+    fit_time = end - start
+
+    y_pred = nn_model.predict(x_train)
+    train_acc = accuracy_score(y_train, y_pred)
+
+    y_pred = nn_model.predict(x_val)
+    val_acc = accuracy_score(y_val, y_pred)
+
+    fitness_curve = np.array(nn_model.fitness_curve)
+
+    if len(fitness_curve.shape) == 2:
+        function_evaluations = int(fitness_curve[-1, -1])
+        loss_curve = fitness_curve[:, 0]
+    else:
+        # This is only for gradient_descent. The number of function evaluations
+        # is equal to the number of epochs
+        assert kwargs['algorithm'] == 'gradient_descent'
+        function_evaluations = len(fitness_curve)
+        loss_curve = fitness_curve.copy()
+
+    iterations = len(fitness_curve)
+
+    nn_results = NNResults(train_acc, val_acc, fit_time, function_evaluations,
+                           iterations)
+
+    import plotly.graph_objects as go
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=list(range(iterations)),
+                             y=loss_curve,
+                             mode='lines'))
+    fig.update_layout({
+        'title': f'{kwargs}'
+    })
+    fig.update_yaxes(type='log')
+    fig.show()
+
+    print(nn_results)
+    exit(0)
+
     '''
     Need to take care of all algorithms
       1. simulated_annealing
@@ -392,4 +454,3 @@ def run_nn_weights():
     simulated_annealing(x_train, y_train, x_val, y_val, 24)
     hill_climbing(x_train, y_train, x_val, y_val, 24)
     genetic_algorithm(x_train, y_train, x_val, y_val, 24)
-    exit(0)

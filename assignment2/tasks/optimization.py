@@ -454,11 +454,12 @@ def _make_alg_params_tuple(
     # MIMIC
     mimic_param_grid = {
         'keep_pct': [0.1, 0.2, 0.3, 0.4],
-        'max_attempts': [10, vector_length]
+        'pop_size': [200, 800, 1400],
+        'max_attempts': [vector_length]
     }
     mimic_plots = [('keep_pct', 'linear')]
-    # algs_params_tuples.append(
-    #     AlgorithmExperimentSetup(mlrose.mimic, mimic_param_grid, mimic_plots))
+    algs_params_tuples.append(
+        AlgorithmExperimentSetup(mlrose.mimic, mimic_param_grid, mimic_plots))
 
     return algs_params_tuples
 
