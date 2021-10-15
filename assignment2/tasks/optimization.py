@@ -252,10 +252,11 @@ def maxkcolor_edges(num_vertices: int, num_edges: int):
 
     """
     if num_edges <= 1 or num_vertices <= 1:
-        raise ValueError
+        raise ValueError('Numbers of edges and vertices must be at least 1')
 
     if num_edges > num_vertices * (num_vertices - 1) / 2:
-        raise ValueError
+        raise ValueError('number of edges must be less than the maximum'
+                         'V (V-1) / 2')
 
     edges = set()
     with temp_seed(1234):
@@ -272,17 +273,18 @@ def maxkcolor_edges(num_vertices: int, num_edges: int):
 
 
 def max_kcolor_task():
-    vert_edge_pairs = [(30, 20), (45, 30), (60, 40)]
+    vert_edge_k_tuples = [(10, 40, 2), (20, 160, 3), (40, 500, 4)]
 
     problems = []
     problem_names = []
-    for num_vertices, num_edges in vert_edge_pairs:
+    for num_vertices, num_edges, k in vert_edge_k_tuples:
         fitness = mlrose.MaxKColor(maxkcolor_edges(num_vertices, num_edges))
         problem_fit = mlrose.DiscreteOpt(length=num_vertices,
                                          fitness_fn=fitness,
-                                         maximize=True)
+                                         maximize=False,
+                                         max_val=k)
         problems.append(problem_fit)
-        problem_names.append(f'maxkcolor_v{num_vertices}_e{num_edges}')
+        problem_names.append(f'maxkcolor_v{num_vertices}_e{num_edges}_k{k}')
 
     return _task1_template(problems, problem_names)
 
@@ -297,9 +299,6 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
     problem_size_plots_data: ProblemSizePlotsData = {}
 
     for problem, problem_name in zip(problems, problem_names):
-        if 'maxkcolor' in problem_name:
-            continue
-
         # Each problem is solved multiple times with different algorithms
         # and different parameters
         algs_params_tuples = _make_alg_params_tuple(problem)
@@ -454,7 +453,7 @@ def _make_alg_params_tuple(
     # MIMIC
     mimic_param_grid = {
         'keep_pct': [0.1, 0.2, 0.3, 0.4],
-        'pop_size': [200, 800, 1400],
+        'pop_size': [2000],
         'max_attempts': [vector_length]
     }
     mimic_plots = [('keep_pct', 'linear')]

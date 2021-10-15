@@ -391,9 +391,12 @@ def run_nn_weights():
 
     # kwargs = {'algorithm': 'random_hill_climb', 'max_iters': 25000,
     #           'learning_rate': 1e-1}
-    kwargs = {'algorithm': 'genetic_alg', 'max_iters': 1500}
+    # kwargs = {'algorithm': 'genetic_alg', 'max_iters': 500,
+    #           'learning_rate': 0.1,  'mutation_prob': 0.5}
     # kwargs = {'algorithm': 'gradient_descent', 'learning_rate': 1e-5,
     #           'max_iters': 7000}
+    kwargs = {'algorithm': 'simulated_annealing', 'max_iters': 25000,
+              'min_temp': 0.00001}
 
     hidden_nodes = HIDDEN_NODES
     kwargs = copy.deepcopy(kwargs)
