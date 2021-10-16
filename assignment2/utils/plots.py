@@ -7,7 +7,7 @@ from utils.grid import GridSummary, OptimizationSummary, Stats
 
 
 def parameter_plot(grid_summary: GridSummary, param_name: str, x_scale: str,
-                   y_axis: str):
+                   y_axis: str, negate_y_axis: bool = False):
     """Generates plots from the grid search summary
 
     Args:
@@ -20,6 +20,7 @@ def parameter_plot(grid_summary: GridSummary, param_name: str, x_scale: str,
         y_axis: y-axis variable to plot. This must be one of
             the named parameters of `grid_summary`, except
             'kwargs' and 'table'.
+        negate_y_axis: If True, the y-axis is flipped.
 
     Returns:
         Plotly go.Figure object.
@@ -57,7 +58,13 @@ def parameter_plot(grid_summary: GridSummary, param_name: str, x_scale: str,
 
     sort_indices = np.argsort(param_values)
     sorted_param_values = [param_values[i] for i in sort_indices]
-    sorted_y_values = [y_values[i] for i in sort_indices]
+
+    if not negate_y_axis:
+        sign = 1.0
+    else:
+        sign = -1.0
+
+    sorted_y_values = [sign * y_values[i] for i in sort_indices]
 
     fig = go.Figure()
     fig.add_trace(

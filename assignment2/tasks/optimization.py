@@ -14,7 +14,7 @@ from utils.grid import OptimizationResults, \
     MultipleResults, \
     grid_args_generator, GridTable, summarize_grid_table, \
     serialize_grid_optimization_summary, GridOptimizationSummary, \
-    parse_grid_optimization_summary, GridSummary, OptimizationSummary
+    parse_grid_optimization_summary, GridSummary, OptimizationSummary, Stats
 from utils.outputs import optimization_grid_table, optimization_grid_summary, \
     optimization_parameter_plot, optimization_fitness_vs_iteration_plot, \
     optimization_alg_vs_problem_size
@@ -46,7 +46,8 @@ class AlgorithmExperimentSetup(NamedTuple):
 class OptimizationExperiment(ExperimentBase):
 
     def __init__(self, problem: mlrose.DiscreteOpt, problem_name: str,
-                 algorithm_setup: AlgorithmExperimentSetup, repeats: int):
+                 algorithm_setup: AlgorithmExperimentSetup, repeats: int,
+                 maximize: bool):
         """Initializes an OptimizationExperiment object
 
         Args:
@@ -58,6 +59,8 @@ class OptimizationExperiment(ExperimentBase):
                 object.
             repeats: How many times each set of
                 hyperparameters is run
+            maximize: If True, it is a maximization problem.
+                If False, it is minimization.
 
         """
         self.problem = problem
@@ -68,6 +71,7 @@ class OptimizationExperiment(ExperimentBase):
         self.alg_plots = algorithm_setup.plots
 
         self.repeats = repeats
+        self._maximize = maximize
 
     @property
     def alg_name(self):
@@ -100,8 +104,10 @@ class OptimizationExperiment(ExperimentBase):
         return parse_grid_optimization_summary(grid_summary_serialized)
 
     def sync_parameter_plots(self, grid_summary: GridSummary):
+        negate_y_axis = not self._maximize
         sync_optimization_parameter_plots(grid_summary, self.alg_plots,
-                                          self.problem_name, self.alg_name)
+                                          self.problem_name, self.alg_name,
+                                          negate_y_axis)
 
     @property
     def plot_hyperparameters(self) -> List[Tuple[str, str]]:
@@ -125,6 +131,9 @@ class OptimizationExperiment(ExperimentBase):
         # Fitness value is the first column.
         # The second one is the function evaluations
         fitness_curve = fitness_curves[:, 0]
+
+        if not self._maximize:
+            fitness_curve = -1 * fitness_curve
 
         return fitness_curve
 
@@ -208,6 +217,7 @@ def grid_run(problem_fit: mlrose.DiscreteOpt, alg_fn: Callable,
     table: GridTable = []
     for kwargs in grid_args_generator(param_grid):
         logging.info(f'Running {kwargs}')
+
         multiple_results = run_multiple(problem_fit, alg_fn, kwargs, repeats)
         table.append((kwargs, multiple_results))
 
@@ -308,9 +318,13 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
         params_grid: Dict[str, Any]
         alg_plots: List[Tuple[str, str]]
 
+        # The maximization flag is read from the problem object
+        fitness_sign = problem.maximize
+        maximization = (problem.maximize > 0)
+
         for alg_setup in algs_params_tuples:
             experiment = OptimizationExperiment(problem, problem_name,
-                                                alg_setup, REPEATS)
+                                                alg_setup, REPEATS, maximization)
             experiment.run()
 
             # Collect data for problem_size_plots_data
@@ -321,8 +335,11 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
             grid_summary: GridOptimizationSummary = \
                 parse_grid_optimization_summary(grid_summary_serialized)
 
+            signed_fitness = Stats(*[fitness_sign * x for x in
+                                           grid_summary.best_fitness])
+
             best_model_summary = OptimizationSummary(
-                grid_summary.best_fitness, grid_summary.duration,
+                signed_fitness, grid_summary.duration,
                 grid_summary.function_evaluations, grid_summary.iterations)
 
             alg_name = experiment.alg_name
@@ -388,7 +405,8 @@ def _infer_general_problem_name(problem_names: List[str]):
 
 def sync_optimization_parameter_plots(grid_summary: GridOptimizationSummary,
                                       alg_plots: List[Tuple[str, str]],
-                                      problem_name: str, alg_name: str):
+                                      problem_name: str, alg_name: str,
+                                      negate: bool):
     for y_axis in OptimizationSummary._fields:
         for param_name, scale in alg_plots:
             figure_path = optimization_parameter_plot(problem_name, alg_name,
@@ -398,7 +416,8 @@ def sync_optimization_parameter_plots(grid_summary: GridOptimizationSummary,
             if os.path.exists(figure_path):
                 continue
 
-            fig = parameter_plot(grid_summary, param_name, scale, y_axis=y_axis)
+            fig = parameter_plot(grid_summary, param_name, scale,
+                                 y_axis=y_axis, negate_y_axis=negate)
 
             fig.write_image(figure_path)
 
@@ -446,7 +465,7 @@ def _make_alg_params_tuple(
         'mutation_prob': 0.5 * np.logspace(0, -3, 5),
         'max_attempts': [vector_length]
     }
-    ga_plots = [('mutation_prob', 'logarithmic')]
+    ga_plots = [('mutation_prob', 'logarithmic'), ('pop_size', 'linear')]
     algs_params_tuples.append(
         AlgorithmExperimentSetup(mlrose.genetic_alg, ga_param_grid, ga_plots))
 

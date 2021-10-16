@@ -302,8 +302,7 @@ def _summarize_multiple_results(multiple_results: MultipleResults,
             [m.function_evaluations for m in multiple_results])
         function_evaluations_stats = _array_stats(function_evaluations)
 
-        iterations = np.array(
-            [m.iterations for m in multiple_results])
+        iterations = np.array([m.iterations for m in multiple_results])
         iterations_stats = _array_stats(iterations)
 
         return OptimizationSummary(best_fitness_stats, duration_stats,
@@ -323,8 +322,7 @@ def _summarize_multiple_results(multiple_results: MultipleResults,
             [m.function_evaluations for m in multiple_results])
         function_evaluations_stats = _array_stats(function_evaluations)
 
-        iterations = np.array(
-            [m.iterations for m in multiple_results])
+        iterations = np.array([m.iterations for m in multiple_results])
         iterations_stats = _array_stats(iterations)
 
         return NNSummary(train_accuracy_stats, val_accuracy_stats,
@@ -335,12 +333,17 @@ def _summarize_multiple_results(multiple_results: MultipleResults,
         raise NotImplementedError
 
 
-def summarize_grid_table(grid_table: GridTable, problem: str):
+def summarize_grid_table(
+        grid_table: GridTable,
+        problem: str,
+        maximize=True) -> Union[GridNNSummary, GridOptimizationSummary]:
     """
 
     Args:
         grid_table:
         problem: Either 'optimization' or 'nn'
+        maximize: If True, pick the kwargs that maximizes
+            the metric. Otherwise, pick
 
     Returns:
 
@@ -350,28 +353,30 @@ def summarize_grid_table(grid_table: GridTable, problem: str):
 
     if problem == 'nn':
         metric_vals = [x.val_accuracy.mean for _, x in summary_table]
+        assert maximize
     elif problem == 'optimization':
         metric_vals = [x.best_fitness.mean for _, x in summary_table]
     else:
         raise NotImplementedError
 
-    argmax = np.argmax(metric_vals)
+    if maximize:
+        index = np.argmax(metric_vals)
+    else:
+        index = np.argmin(metric_vals)
 
-    kwargs, summary = summary_table[argmax]
+    kwargs, summary = summary_table[index]
 
     if problem == 'nn':
         summary: NNSummary
         return GridNNSummary(summary.train_accuracy, summary.val_accuracy,
                              summary.fit_time, summary.function_evaluations,
-                             summary.iterations,
-                             kwargs, summary_table)
+                             summary.iterations, kwargs, summary_table)
 
     elif problem == 'optimization':
         summary: OptimizationSummary
         return GridOptimizationSummary(summary.best_fitness, summary.duration,
                                        summary.function_evaluations,
-                                       summary.iterations,
-                                       kwargs,
+                                       summary.iterations, kwargs,
                                        summary_table)
 
     else:
@@ -440,7 +445,8 @@ def serialize_grid_nn_summary(grid_nn_summary: GridNNSummary):
     train_accuracy = _serialize_stats(grid_nn_summary.train_accuracy)
     val_accuracy = _serialize_stats(grid_nn_summary.val_accuracy)
     fit_time = _serialize_stats(grid_nn_summary.fit_time)
-    function_evaluations = _serialize_stats(grid_nn_summary.function_evaluations)
+    function_evaluations = _serialize_stats(
+        grid_nn_summary.function_evaluations)
     iterations = _serialize_stats(grid_nn_summary.iterations)
     kwargs = grid_nn_summary.kwargs
     table = _serialize_summary_table(grid_nn_summary.table)
@@ -465,8 +471,7 @@ def parse_grid_nn_summary(d: Dict[str, Any]):
     kwargs = d['kwargs']
     table = _parse_summary_table(d['table'])
     return GridNNSummary(train_accuracy, val_accuracy, fit_time,
-                         function_evaluations, iterations,
-                         kwargs, table)
+                         function_evaluations, iterations, kwargs, table)
 
 
 def serialize_grid_optimization_summary(
@@ -475,8 +480,7 @@ def serialize_grid_optimization_summary(
     duration = _serialize_stats(grid_opt_summary.duration)
     function_evaluations = _serialize_stats(
         grid_opt_summary.function_evaluations)
-    iterations = _serialize_stats(
-        grid_opt_summary.iterations)
+    iterations = _serialize_stats(grid_opt_summary.iterations)
     kwargs = grid_opt_summary.kwargs
     table = _serialize_summary_table(grid_opt_summary.table)
 
@@ -499,5 +503,4 @@ def parse_grid_optimization_summary(d: Dict[str, Any]):
     table = _parse_summary_table(d['table'])
 
     return GridOptimizationSummary(best_fitness, duration, function_evaluations,
-                                   iterations,
-                                   kwargs, table)
+                                   iterations, kwargs, table)

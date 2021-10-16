@@ -26,7 +26,7 @@ from utils.plots import parameter_plot
 
 HIDDEN_NODES = [16] * 4
 
-REPEATS = 12
+REPEATS = 6
 
 
 class NNExperiment(ExperimentBase):
@@ -260,9 +260,10 @@ def simulated_annealing(x_train: np.ndarray, y_train: np.ndarray,
 
     param_grid = {
         'algorithm': [algorithm_name],
-        'init_temp': [1.0, 10.0, 100.0],
-        'decay': [0.99, 0.999, 0.9999],
-        'learning_rate': [1, 0.1, 0.01, 0.001, 0.001]
+        'init_temp': [1.0],
+        'decay': [0.99],
+        'learning_rate': [0.1],
+        'max_iters': [25000],
     }
 
     alg_plots = [('init_temp', 'logarithmic'), ('decay', 'logarithmic')]
@@ -277,8 +278,9 @@ def hill_climbing(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
 
     param_grid = {
         'algorithm': [algorithm_name],
-        'restarts': [0, 10, 50],
-        'learning_rate': [1, 0.1, 0.01, 0.001, 0.001]
+        'restarts': [0],
+        'learning_rate': [0.1, 0.01],
+        'max_iters': [25000]
     }
 
     alg_plots = [('restarts', 'linear')]
@@ -293,8 +295,9 @@ def genetic_algorithm(x_train: np.ndarray, y_train: np.ndarray,
 
     param_grid = {
         'algorithm': [algorithm_name],
-        'mutation_prob': np.logspace(-1, -5, 5),
-        'learning_rate': [1, 0.1, 0.01, 0.001, 0.001]
+        'mutation_prob': [0.1],
+        'learning_rate': [0.1],
+        'max_iters': [10000]
     }
 
     alg_plots = [('mutation_prob', 'logarithmic')]
@@ -388,15 +391,15 @@ def run_nn_weights():
     assert len(x_train) == len(y_train) == n_train
     assert len(x_val) == len(y_val) == n_val
     assert len(x_test) == len(y_test) == n_test
-
+    '''
     # kwargs = {'algorithm': 'random_hill_climb', 'max_iters': 25000,
     #           'learning_rate': 1e-1}
-    # kwargs = {'algorithm': 'genetic_alg', 'max_iters': 500,
-    #           'learning_rate': 0.1,  'mutation_prob': 0.5}
+    kwargs = {'algorithm': 'genetic_alg', 'max_iters': 10000,
+              'learning_rate': 0.1,  'mutation_prob': 0.1}
     # kwargs = {'algorithm': 'gradient_descent', 'learning_rate': 1e-5,
     #           'max_iters': 7000}
-    kwargs = {'algorithm': 'simulated_annealing', 'max_iters': 25000,
-              'min_temp': 0.00001}
+    # kwargs = {'algorithm': 'simulated_annealing', 'max_iters': 25000,
+    #           'min_temp': 0.00001}
 
     hidden_nodes = HIDDEN_NODES
     kwargs = copy.deepcopy(kwargs)
@@ -446,6 +449,8 @@ def run_nn_weights():
 
     print(nn_results)
     exit(0)
+    
+    '''
 
     '''
     Need to take care of all algorithms
@@ -454,6 +459,7 @@ def run_nn_weights():
       3. hill_climb
     '''
 
-    simulated_annealing(x_train, y_train, x_val, y_val, 24)
-    hill_climbing(x_train, y_train, x_val, y_val, 24)
-    genetic_algorithm(x_train, y_train, x_val, y_val, 24)
+    simulated_annealing(x_train, y_train, x_val, y_val, REPEATS)
+    hill_climbing(x_train, y_train, x_val, y_val, REPEATS)
+    genetic_algorithm(x_train, y_train, x_val, y_val, 2)
+    gradient_descent(x_train, y_train, x_val, y_val, REPEATS)

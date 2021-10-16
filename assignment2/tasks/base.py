@@ -105,7 +105,7 @@ class ExperimentBase(ABC):
         else:
             fitness_curve = joblib.load(fitness_curve_joblib_path)
 
-        fitness_curve_png_path = f'{self.fitness_curve_name}.png'
+        fitness_curve_png_path = f'{self.fitness_curve_name}'
 
         # Generate the actual figure with the fitness_curve
         if not os.path.exists(fitness_curve_png_path):
