@@ -115,8 +115,9 @@ class OptimizationExperiment(ExperimentBase):
 
     @property
     def plot_metrics(self) -> List[str]:
-        return ['best_fitness', 'duration', 'function_evaluations',
-                'iterations']
+        return [
+            'best_fitness', 'duration', 'function_evaluations', 'iterations'
+        ]
 
     def hyperparameter_plot_path(self, param_name: str, metric: str):
         return optimization_parameter_plot(self.problem_name, self.alg_name,
@@ -324,7 +325,8 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
 
         for alg_setup in algs_params_tuples:
             experiment = OptimizationExperiment(problem, problem_name,
-                                                alg_setup, REPEATS, maximization)
+                                                alg_setup, REPEATS,
+                                                maximization)
             experiment.run()
 
             # Collect data for problem_size_plots_data
@@ -335,8 +337,12 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
             grid_summary: GridOptimizationSummary = \
                 parse_grid_optimization_summary(grid_summary_serialized)
 
-            signed_fitness = Stats(*[fitness_sign * x for x in
-                                           grid_summary.best_fitness])
+            if maximization:
+                signed_fitness = grid_summary.best_fitness
+            else:
+                f = grid_summary.best_fitness
+                signed_fitness = Stats(-f.mean, -f.median, f.std, -f.q3, -f.q1,
+                                       -f.max, -f.min)
 
             best_model_summary = OptimizationSummary(
                 signed_fitness, grid_summary.duration,
@@ -352,7 +358,8 @@ def _task1_template(problems: List[mlrose.DiscreteOpt],
     sync_alg_vs_problem_size_plots(problem_size_plots_data)
 
 
-def sync_alg_vs_problem_size_plots(problem_size_plots_data: ProblemSizePlotsData):
+def sync_alg_vs_problem_size_plots(
+        problem_size_plots_data: ProblemSizePlotsData):
     for alg_name, plot_data in problem_size_plots_data.items():
         problem_names: List[str]
         summaries: List[OptimizationSummary]
@@ -363,16 +370,12 @@ def sync_alg_vs_problem_size_plots(problem_size_plots_data: ProblemSizePlotsData
         for metric in OptimizationSummary._fields:
 
             figure_path = optimization_alg_vs_problem_size(
-                general_problem_name,
-                alg_name,
-                metric
-            )
+                general_problem_name, alg_name, metric)
 
             if os.path.exists(figure_path):
                 continue
 
-            fig = alg_vs_problem_size_plot(problem_names, summaries,
-                                           metric)
+            fig = alg_vs_problem_size_plot(problem_names, summaries, metric)
             fig.write_image(figure_path)
 
 
@@ -416,8 +419,11 @@ def sync_optimization_parameter_plots(grid_summary: GridOptimizationSummary,
             if os.path.exists(figure_path):
                 continue
 
-            fig = parameter_plot(grid_summary, param_name, scale,
-                                 y_axis=y_axis, negate_y_axis=negate)
+            fig = parameter_plot(grid_summary,
+                                 param_name,
+                                 scale,
+                                 y_axis=y_axis,
+                                 negate_y_axis=negate)
 
             fig.write_image(figure_path)
 

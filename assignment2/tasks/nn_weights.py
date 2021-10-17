@@ -92,7 +92,14 @@ class NNExperiment(ExperimentBase):
 
         nn_model.fit(self.x_train, self.y_train)
 
-        fitness_curve = np.array(nn_model.fitness_curve)[:, 0]
+        fitness_curve = np.array(nn_model.fitness_curve)
+
+        if len(fitness_curve.shape) == 2:
+            fitness_curve = fitness_curve[:, 0]
+        else:
+            # This is only for gradient_descent. The number of function evaluations
+            # is equal to the number of epochs
+            assert kwargs['algorithm'] == 'gradient_descent'
 
         assert len(fitness_curve.shape) == 1, \
             f'Array of shape {fitness_curve.shape} is not 1-D.'
@@ -261,8 +268,9 @@ def simulated_annealing(x_train: np.ndarray, y_train: np.ndarray,
     param_grid = {
         'algorithm': [algorithm_name],
         'init_temp': [1.0],
-        'decay': [0.99],
-        'learning_rate': [0.1],
+        'decay': [0.99, 0.999, 0.9999],
+        'learning_rate': [0.1, 0.001, 0.001, 0.0001],
+        'min_temp': [0.001, 0.0001, 0.00001],
         'max_iters': [25000],
     }
 
@@ -279,7 +287,7 @@ def hill_climbing(x_train: np.ndarray, y_train: np.ndarray, x_val: np.ndarray,
     param_grid = {
         'algorithm': [algorithm_name],
         'restarts': [0],
-        'learning_rate': [0.1, 0.01],
+        'learning_rate': [0.1, 0.01, 0.001, 0.0001],
         'max_iters': [25000]
     }
 
@@ -293,6 +301,7 @@ def genetic_algorithm(x_train: np.ndarray, y_train: np.ndarray,
                       x_val: np.ndarray, y_val: np.ndarray, repeats: int):
     algorithm_name = 'genetic_alg'
 
+    # These values were manually tuned.
     param_grid = {
         'algorithm': [algorithm_name],
         'mutation_prob': [0.1],
@@ -312,7 +321,8 @@ def gradient_descent(x_train: np.ndarray, y_train: np.ndarray,
 
     param_grid = {
         'algorithm': [algorithm_name],
-        'learning_rate': np.logspace(-4, -6, 5)
+        'learning_rate': np.logspace(-4, -6, 5),
+        'max_iters': [7000]
     }
 
     alg_plots = [('learning_rate', 'logarithmic')]
@@ -391,73 +401,6 @@ def run_nn_weights():
     assert len(x_train) == len(y_train) == n_train
     assert len(x_val) == len(y_val) == n_val
     assert len(x_test) == len(y_test) == n_test
-    '''
-    # kwargs = {'algorithm': 'random_hill_climb', 'max_iters': 25000,
-    #           'learning_rate': 1e-1}
-    kwargs = {'algorithm': 'genetic_alg', 'max_iters': 10000,
-              'learning_rate': 0.1,  'mutation_prob': 0.1}
-    # kwargs = {'algorithm': 'gradient_descent', 'learning_rate': 1e-5,
-    #           'max_iters': 7000}
-    # kwargs = {'algorithm': 'simulated_annealing', 'max_iters': 25000,
-    #           'min_temp': 0.00001}
-
-    hidden_nodes = HIDDEN_NODES
-    kwargs = copy.deepcopy(kwargs)
-    kwargs['hidden_nodes'] = hidden_nodes
-    kwargs['curve'] = True
-    nn_model = get_nn(**kwargs)
-
-    start = time.time()
-    nn_model.fit(x_train, y_train)
-    end = time.time()
-    fit_time = end - start
-
-    y_pred = nn_model.predict(x_train)
-    train_acc = accuracy_score(y_train, y_pred)
-
-    y_pred = nn_model.predict(x_val)
-    val_acc = accuracy_score(y_val, y_pred)
-
-    fitness_curve = np.array(nn_model.fitness_curve)
-
-    if len(fitness_curve.shape) == 2:
-        function_evaluations = int(fitness_curve[-1, -1])
-        loss_curve = fitness_curve[:, 0]
-    else:
-        # This is only for gradient_descent. The number of function evaluations
-        # is equal to the number of epochs
-        assert kwargs['algorithm'] == 'gradient_descent'
-        function_evaluations = len(fitness_curve)
-        loss_curve = fitness_curve.copy()
-
-    iterations = len(fitness_curve)
-
-    nn_results = NNResults(train_acc, val_acc, fit_time, function_evaluations,
-                           iterations)
-
-    import plotly.graph_objects as go
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=list(range(iterations)),
-                             y=loss_curve,
-                             mode='lines'))
-    fig.update_layout({
-        'title': f'{kwargs}'
-    })
-    fig.update_yaxes(type='log')
-    fig.show()
-
-    print(nn_results)
-    exit(0)
-    
-    '''
-
-    '''
-    Need to take care of all algorithms
-      1. simulated_annealing
-      2. simulated_annealing
-      3. hill_climb
-    '''
 
     simulated_annealing(x_train, y_train, x_val, y_val, REPEATS)
     hill_climbing(x_train, y_train, x_val, y_val, REPEATS)
