@@ -1,31 +1,47 @@
-# Algorithm Comparison
+# Assignment 2 - Randomized Optimization
 
-Simulated Annealing: May be stuck in local minima. Good if
-the problems don't have global optimum with narrow peaks.
+## Virtual Environment Setup
 
-Genetic algorithm
+In Ubuntu 18.04, the following commands were tested to create
+the virtual environment.
 
-MIMIC: Good when there is a structure.
+```shell
+# Create a new environment "assignment2" with Python 3.7
+conda create -n assignment2 python=3.7
 
-## Problem 1 
+# Install the rest of the packages
+pip install -r requirements.txt
+```
 
-Discrete optimization only
+## Running The Code
 
-Highlights genetic algorithm. 
+Use the `main.py` script to run the code. This will automatically generate 
+all plots and results.
 
-1. Continuous peaks --> Should highlight the simulated annealing?
-2. Four peaks / six peaks --> Should highlight GA
-3. MaxKColor --> Should highlight MIMIC
+```shell
+# Must be run inside the virtual environment
+python main.py
+```
 
-Algorithm                   | Parameter to tune                        |
-----------------------------|------------------------------------------|
-Hill climbing               | `restarts`                               |
-Simulated annealing         | `max_attempts = length`, (`schedule`?)   |
-Genetic algorithm           | `mutation_prob`, `max_attempts = length` |
-MIMIC                       | `keep_pct=[0.1, ..., 0.9]`               |
+The code execution is as follows:
+- If the `outputs` directory is empty, running `main.y` will run 
+  all optimization algorithms and produce the output files.
+- Otherwise, if some files can be found in the `outputs` 
+directory, the code execution will skip generating files that can
+be found. This implies that:
+  - To re-run a particular problem with a particular optimization algorithm, 
+    simply delete the corresponding `json` file.  
+  - To regenerate a plot, remove the corresponding `.png` file.
 
-# Notes
+## Directory Structure
 
-## MLRose Implementations
+Here is the directory structure.
 
-### GA
+```
+.
+├── outputs/    # Output directory to store the all outputs
+├── tasks/      # Contains business logic of the project
+├── utils/      # Utility packages 
+├── main.py     # Script to run
+└── README.md
+```
