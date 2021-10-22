@@ -1,5 +1,6 @@
 import os
 from typing import Type, Union, Callable, List
+from multiprocessing import Pool
 
 import joblib
 import numpy as np
@@ -19,15 +20,18 @@ ClusteringVisualizationFunc = Callable[[np.ndarray, np.ndarray, List[str]],
 
 
 def run_clustering(dataset_name: str, x_train: np.ndarray,
-                   visualization_fn: ClusteringVisualizationFunc):
+                   visualization_fn: ClusteringVisualizationFunc,
+                   n_jobs: int = 1):
     clustering_algs = [KMeans, GaussianMixture]
 
     for alg in clustering_algs:
-        clusterer = sync_clusterer(alg, dataset_name, x_train)
-        synchronize_visualization(dataset_name, x_train, clusterer, visualization_fn)
+        clusterer = sync_clusterer(alg, dataset_name, x_train, n_jobs)
+        synchronize_visualization(dataset_name, x_train, clusterer,
+                                  visualization_fn)
 
 
-def sync_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray):
+def sync_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray,
+                   n_jobs: int):
     """Synchronizes clusterer
 
     To synchronize means to create when a file does not
@@ -45,6 +49,7 @@ def sync_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray):
             KMeans or GaussianMixture
         dataset_name: Dataset name
         x_train: Training data
+        n_jobs: Number of Python processes to use
 
     Returns:
         A clusterer instance. This is the clusterer that
@@ -64,16 +69,16 @@ def sync_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray):
     else:
         # Create a clusterer which maximizes the silhouette score.
         n_clusters = list(range(2, 17))
-        silhouette_scores = []
-        clusterers = []
 
-        for n_cluster in n_clusters:
-            clusterer = alg(n_cluster)
-            cluster_labels = clusterer.fit_predict(x_train)
+        def args_generator():
+            for n_cluster in n_clusters:
+                yield alg, n_cluster, x_train
 
-            score = silhouette_score(x_train, cluster_labels)
-            silhouette_scores.append(score)
-            clusterers.append(clusterer)
+        with Pool(n_jobs) as pool:
+            # tuples = [..., (clusterer, score), ...]
+            tuples = pool.starmap(_cluster_data, args_generator())
+
+        clusterers, silhouette_scores = zip(*tuples)
 
         best_index = int(np.argmax(silhouette_scores))
         best_clusterer = clusterers[best_index]
@@ -86,6 +91,16 @@ def sync_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray):
             fig.write_image(silhouette_plot_path)
 
     return best_clusterer
+
+
+def _cluster_data(alg, n_cluster, x_train):
+    """Function for clustering with multiprocessing purposes"""
+    clusterer = alg(n_cluster)
+    cluster_labels = clusterer.fit_predict(x_train)
+
+    score = silhouette_score(x_train, cluster_labels)
+
+    return clusterer, score
 
 
 def synchronize_visualization(dataset_name: str, x_train: np.ndarray,

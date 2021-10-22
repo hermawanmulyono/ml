@@ -2,7 +2,10 @@ from typing import List
 
 import numpy as np
 from plotly import graph_objects as go
+import matplotlib.pyplot as plt
+from matplotlib import offsetbox
 from sklearn.manifold import TSNE
+from sklearn.preprocessing import MinMaxScaler
 
 
 def visualize_3d_data(x_data: np.ndarray, y_data: np.ndarray,
@@ -54,7 +57,9 @@ def _add_scatter_dataset3d(fig: go.Figure, x_data, y_data, scatter_alpha: float,
         raise ValueError(
             f'Possible labels are not consistent with the labels {categories}')
 
-    for label, category_name in zip(possible_labels, categories):
+    for label in possible_labels:
+        category_name = categories[label]
+
         selected_indices = (y_data == label)
         x_selected = x_data[selected_indices]
 
@@ -89,14 +94,60 @@ def silhouette_plot(n_clusters: List[int],
     return fig
 
 
+class MatplotlibAdapter:
+    """Adapter for a Matplotlib figure to plotly go.Figure()
+
+    Matplotlib offers low-level operations for advanced
+    figure manipulations. However, most of the time,
+    it is faster to work with plotly. This class can be used
+    with code that expects plotly's `write_image()`.
+
+    """
+
+    def __init__(self, fig, ax):
+        self.fig = fig
+        self.ax = ax
+        plt.close()
+
+    def write_image(self, path_to_image):
+        self.fig.savefig(path_to_image)
+
+
 def visualize_fashion_mnist(x_data: np.ndarray, y_data: np.ndarray,
                             categories: List[str]):
+    """Visualizes Fashion-Mnist dataset
+
+    The t-SNE algorithm is used to map a the 784-dimensional
+    vectors into 2-dimensional data.
+
+    Some thumbnails will be displayed, along with the
+    t-SNE projection.
+
+    Args:
+        x_data: Fashion-MNIST feature array
+        y_data: The `x_data` labels
+        categories: An ordered list of category names
+
+    Returns:
+        A MatplotlibAdapter object, which has a
+            `write_image()` method, just like go.Figure.
+    """
+
+    # https://scikit-learn.org/stable/auto_examples/manifold/plot_lle_digits.html
+
+    if len(x_data) != len(y_data):
+        raise ValueError('x_data and y_data must have the same length.')
+
+    if x_data.shape[1] != 784:
+        raise ValueError('x_data of Fashion-MNIST must be 784-dimensional')
+
     tsne = TSNE()
     transformed = tsne.fit_transform(x_data, y_data)
-
     assert len(transformed.shape) == 2
 
-    fig = go.Figure()
+    fig, ax = plt.subplots()
+    fig.set_size_inches(20, 20)
+    transformed = MinMaxScaler().fit_transform(transformed)
 
     possible_labels = sorted(set(y_data))
     if not ((0 <= min(possible_labels)) and
@@ -104,13 +155,36 @@ def visualize_fashion_mnist(x_data: np.ndarray, y_data: np.ndarray,
         raise ValueError(
             f'Possible labels are not consistent with the labels {categories}')
 
-    for label, category_name in zip(possible_labels, categories):
-        selected_indices = (y_data == label)
+    original_indices = np.arange(len(x_data))
+
+    shown_images = np.array([[1.0, 1.0]])  # initially, just something big
+
+    for label in possible_labels:
+        category_name = categories[label]
+
+        selected_indices = original_indices[y_data == label]
         x_selected = transformed[selected_indices]
 
-        fig.add_trace(
-            go.Scatter3d(x=x_selected[:, 0],
-                         y=x_selected[:, 1],
-                         mode='markers',
-                         name=category_name))
-    return fig
+        plt.scatter(x_selected[:, 0], x_selected[:, 1], label=category_name)
+
+        for i in selected_indices:
+            # show an annotation box for a group of digits
+            dist = np.sum((transformed[i] - shown_images)**2, 1)
+            if np.min(dist) < 5e-3:
+                # don't show points that are too close
+                continue
+            shown_images = np.concatenate([shown_images, [transformed[i]]],
+                                          axis=0)
+
+            x_disp = x_data[i]
+            thumbnail = np.reshape(x_disp, (28, 28))
+
+            imagebox = offsetbox.AnnotationBbox(
+                offsetbox.OffsetImage(thumbnail, cmap=plt.cm.gray_r),
+                transformed[i])
+            ax.add_artist(imagebox)
+
+    ax.legend()
+    adapter_figure = MatplotlibAdapter(fig, ax)
+
+    return adapter_figure
