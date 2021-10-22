@@ -2,7 +2,7 @@ import os
 import contextlib
 
 import numpy as np
-# import torchvision
+import torchvision
 from sklearn.model_selection import train_test_split
 
 
