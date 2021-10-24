@@ -75,6 +75,10 @@ def _gen_3d_examples(x1_size: float, x2_size: float, num_examples: int,
 
     x1x2_data = np.random.multivariate_normal(mean_, cov_, size=num_examples)
 
+    # x1_data = np.random.uniform(0, x1_size, size=num_examples)
+    # x2_data = np.random.uniform(0, x2_size, size=num_examples)
+    # x1x2_data = np.stack([x1_data, x2_data], axis=-1)
+
     # Construct labels
     y_data = np.zeros((num_examples,))
 
@@ -90,7 +94,9 @@ def _gen_3d_examples(x1_size: float, x2_size: float, num_examples: int,
     y_data = y_data.astype(np.int)
 
     x3_mean = prob * 2 - 1  # Probability [0, 1] -> [-1, +1]
+    # x3_mean = np.zeros((num_examples, ))
     std = 2 * np.sqrt(0.25 - np.power(np.power(prob, 10000) - 0.5, 2))
+    # std = 0.01
     x3 = np.random.normal(x3_mean, std)
 
     x_data = np.concatenate([x1x2_data, x3.reshape((-1, 1))], axis=-1)

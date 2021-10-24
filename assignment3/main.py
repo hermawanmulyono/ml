@@ -7,12 +7,13 @@ import plotly.graph_objects as go
 
 from utils.data import gen_3d_data, get_fashion_mnist_data
 from utils.plots import visualize_3d_data, visualize_fashion_mnist
-from utils.tasks import run_clustering
+from utils.tasks import run_clustering, run_dim_reduction
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-n', '--n_jobs', default=1,
+                        type=int,
                         help='Number of Python processes to use')
     args = parser.parse_args()
     return args.n_jobs
@@ -30,31 +31,7 @@ def dataset1(n_jobs: int):
         x1_size, x2_size, n_train, n_val, n_test, noise_prob)
     dataset_name = 'Dataset3D'
     run_clustering(dataset_name, x_train, visualize_3d_data, n_jobs)
-
-    # fig = visualize_3d_data(x_train, y_train, ['negative', 'positive'])
-    # fig.show()
-    #
-    # # Need to cache the trained kmeans
-    # n_clusters = list(range(2, 17))
-    # silhouette_scores = []
-    # for n_cluster in n_clusters:
-    #     kmeans = KMeans(n_cluster)
-    #     cluster_labels = kmeans.fit_predict(x_train)
-    #
-    #     score = silhouette_score(x_train, cluster_labels)
-    #     silhouette_scores.append(score)
-    #
-    # fig = go.Figure()
-    # fig.add_trace(go.Scatter(x=n_clusters,
-    #                          y=silhouette_scores))
-    # fig.show()
-    #
-    # best_n_cluster = n_clusters[int(np.argmax(silhouette_scores))]
-    # kmeans = KMeans(best_n_cluster)
-    # cluster_labels = kmeans.fit_predict(x_train)
-    # categories = [f'cluster_{c}' for c in kmeans.labels_]
-    #
-    # visualize_3d_data(x_train, cluster_labels, categories).show()
+    run_dim_reduction(x_train, y_train, sync=True)
 
 
 def dataset2(n_jobs: int):

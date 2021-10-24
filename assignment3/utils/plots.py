@@ -76,21 +76,24 @@ def _add_scatter_dataset3d(fig: go.Figure, x_data, y_data, scatter_alpha: float,
     return fig
 
 
-def silhouette_plot(n_clusters: List[int],
-                    silhouette_scores: List[float]) -> go.Figure:
-    """Generates silhouette plot figure
+def clustering_score_plot(n_clusters: List[int],
+                          scores: List[float]) -> go.Figure:
+    """Generates clustering score plot figure
+
+    A clustering score defines how good a clustering is,
+    such as silhouette, or Calinski-Harabasz Index.
 
     Args:
         n_clusters: List of n_cluster values
-        silhouette_scores: Silhouette scores corresponding
+        scores: Clustering scores corresponding
             to `n_clusters`.
 
     Returns:
-        A silhouette score plot
+        A clustering score plot
 
     """
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=n_clusters, y=silhouette_scores))
+    fig.add_trace(go.Scatter(x=n_clusters, y=scores))
     return fig
 
 
@@ -123,6 +126,9 @@ def visualize_fashion_mnist(x_data: np.ndarray, y_data: np.ndarray,
     Some thumbnails will be displayed, along with the
     t-SNE projection.
 
+    The Matplotlib visualization is adapted from
+    https://scikit-learn.org/stable/auto_examples/manifold/plot_lle_digits.html
+
     Args:
         x_data: Fashion-MNIST feature array
         y_data: The `x_data` labels
@@ -132,8 +138,6 @@ def visualize_fashion_mnist(x_data: np.ndarray, y_data: np.ndarray,
         A MatplotlibAdapter object, which has a
             `write_image()` method, just like go.Figure.
     """
-
-    # https://scikit-learn.org/stable/auto_examples/manifold/plot_lle_digits.html
 
     if len(x_data) != len(y_data):
         raise ValueError('x_data and y_data must have the same length.')
@@ -146,7 +150,7 @@ def visualize_fashion_mnist(x_data: np.ndarray, y_data: np.ndarray,
     assert len(transformed.shape) == 2
 
     fig, ax = plt.subplots()
-    fig.set_size_inches(20, 20)
+    fig.set_size_inches(10, 10)
     transformed = MinMaxScaler().fit_transform(transformed)
 
     possible_labels = sorted(set(y_data))
@@ -170,7 +174,7 @@ def visualize_fashion_mnist(x_data: np.ndarray, y_data: np.ndarray,
         for i in selected_indices:
             # show an annotation box for a group of digits
             dist = np.sum((transformed[i] - shown_images)**2, 1)
-            if np.min(dist) < 5e-3:
+            if np.min(dist) < 6e-3:
                 # don't show points that are too close
                 continue
             shown_images = np.concatenate([shown_images, [transformed[i]]],

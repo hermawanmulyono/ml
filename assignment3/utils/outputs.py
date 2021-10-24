@@ -13,11 +13,15 @@ def clusterer_joblib(dataset_name: str, alg_name: str):
     return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}_clusterer.joblib'
 
 
-def silhouette_png(dataset_name: str, alg_name: str):
-    return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}_silhouette.png'
+def clustering_score_png(dataset_name: str, alg_name: str):
+    return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}_clustering_score.png'
 
 
 def clustering_visualization_png(dataset_name: str, alg_name: str):
     return f'{OUTPUT_DIRECTORY}/{dataset_name}_' \
            f'{alg_name}_clustering_visualization.png'
+
+
+def reduction_alg_joblib(dataset_name: str, alg_name: str):
+    return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}_reduction_alg.joblib'
 
