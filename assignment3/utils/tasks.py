@@ -127,10 +127,10 @@ def run_dim_reduction(x_data: np.ndarray, y_data: np.ndarray, sync=False):
     visualize_3d_data(x_data, y_data, ['0', '1']).show()
 
     for n_dims in range(1, 4):
-        _reduce_rp(x_data, y_data, n_dims)
+        _reduce_pca(x_data, y_data, n_dims)
 
 
-def _reduce_pca(x_data: np.ndarray, y_data: np.ndarray, dataset_name: str,
+def _reduce_pca(x_data: np.ndarray, y_data: np.ndarray,
                 n_dims: int):
     """Reduces the `x_data` to `n_dims` dimensions.
 
@@ -149,7 +149,21 @@ def _reduce_pca(x_data: np.ndarray, y_data: np.ndarray, dataset_name: str,
     x_reduced = pca.fit_transform(x_data)
     print(pca.explained_variance_)
 
+    x_rec = reconstruct_pca(pca, x_data)
+    error = reconstruction_error(x_data, x_rec)
+    print(error)
+
+    categories = sorted(set(y_data))
+    fig = visualize_3d_data(x_rec, y_data, [f'{c}' for c in categories])
+    fig.show()
+
     return x_reduced, pca
+
+
+def reconstruct_pca(pca: PCA, X: np.ndarray):
+    x_proj = pca.transform(X)
+    x_rec = np.dot(x_proj, pca.components_) + pca.mean_
+    return x_rec
 
 
 def _reduce_ica(x_data: np.ndarray, y_data: np.ndarray, n_dims: int):
@@ -209,16 +223,22 @@ def _reduce_rp(x_data: np.ndarray, y_data: np.ndarray, n_dims: int):
     rp = GaussianRP(n_dims)
     x_reduced = rp.fit_transform(x_data)
 
-    components = rp.components_
+    x_rec = rp.reconstruct(x_data)
 
-    x_proj = np.dot(x_data, components.T)
-    x_rec = np.dot(x_proj, components)
+    error = reconstruction_error(x_data, x_rec)
+    print(f'error {error}')
 
     categories = sorted(set(y_data))
     fig = visualize_3d_data(x_rec, y_data, [f'{c}' for c in categories])
     fig.show()
 
     return x_reduced, rp
+
+
+def reconstruction_error(x_data: np.ndarray, x_rec: np.ndarray):
+    delta = np.linalg.norm(x_data - x_rec, axis=1)
+    error = np.mean(np.power(delta, 2))
+    return error
 
 
 def _reduce_forward(x_data: np.ndarray, y_data: np.ndarray, n_dims: int):

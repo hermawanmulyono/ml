@@ -38,6 +38,15 @@ class GaussianRP:
     def components_(self):
         return self.R
 
+    def reconstruct(self, X: np.ndarray):
+        _check_input(X)
+
+        x_proj = self.transform(X)
+        R = self.R
+        x_rec = np.dot(x_proj, R)
+
+        return x_rec
+
 
 def _check_input(X: np.ndarray):
     """Checks if input array X is valid
