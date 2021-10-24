@@ -1,5 +1,5 @@
 import os
-from typing import Type, Union, Callable, List
+from typing import Type, Union, Callable, List, Optional
 from multiprocessing import Pool
 
 import joblib
@@ -12,9 +12,10 @@ from sklearn.metrics import silhouette_score, calinski_harabasz_score
 from scipy.stats import kurtosis
 import plotly.graph_objects as go
 
+from utils.gaussian_rp import GaussianRP
 from utils.outputs import clusterer_joblib, clustering_score_png, \
     clustering_visualization_png
-from utils.plots import clustering_score_plot
+from utils.plots import clustering_score_plot, visualize_3d_data
 
 ClusteringAlg = Union[KMeans, GaussianMixture]
 
@@ -123,8 +124,10 @@ def run_dim_reduction(x_data: np.ndarray, y_data: np.ndarray, sync=False):
     alg_names = ['pca', 'ica', 'rp', 'forward']
     funcs = []
 
+    visualize_3d_data(x_data, y_data, ['0', '1']).show()
+
     for n_dims in range(1, 4):
-        _reduce_ica(x_data, y_data, n_dims)
+        _reduce_rp(x_data, y_data, n_dims)
 
 
 def _reduce_pca(x_data: np.ndarray, y_data: np.ndarray, dataset_name: str,
@@ -166,7 +169,7 @@ def _reduce_ica(x_data: np.ndarray, y_data: np.ndarray, n_dims: int):
     # Need to choose optimal N
 
     mixing = ica.mixing_
-    from utils.plots import visualize_3d_data
+
     categories = sorted(set(y_data))
     fig = visualize_3d_data(x_data, y_data, [f'{c}' for c in categories])
 
@@ -203,8 +206,17 @@ def _reduce_ica(x_data: np.ndarray, y_data: np.ndarray, n_dims: int):
 
 
 def _reduce_rp(x_data: np.ndarray, y_data: np.ndarray, n_dims: int):
-    rp = random_projection.SparseRandomProjection(n_dims)
+    rp = GaussianRP(n_dims)
     x_reduced = rp.fit_transform(x_data)
+
+    components = rp.components_
+
+    x_proj = np.dot(x_data, components.T)
+    x_rec = np.dot(x_proj, components)
+
+    categories = sorted(set(y_data))
+    fig = visualize_3d_data(x_rec, y_data, [f'{c}' for c in categories])
+    fig.show()
 
     return x_reduced, rp
 
