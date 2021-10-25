@@ -85,7 +85,8 @@ def sync_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray,
 
         clusterers, clustering_scores = zip(*tuples)
 
-        best_index = int(np.argmax(clustering_scores))
+        # best_index = int(np.argmax(clustering_scores))
+        best_index = _best_clustering_index(clustering_scores)
         best_clusterer = clusterers[best_index]
 
         if not joblib_exists:
@@ -98,12 +99,48 @@ def sync_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray,
     return best_clusterer
 
 
+def _best_clustering_index(clustering_scores: List[float]) -> int:
+    """Chooses best clustering index
+
+    Try to choose the maximum local maximum. Otherwise,
+    choose the one with max score.
+
+    Args:
+        clustering_scores: A list of clustering scores. The
+            higher, the better.
+
+    Returns:
+        Best clustering index
+
+    """
+    indices = np.arange(len(clustering_scores))
+
+    x = np.array(clustering_scores)
+
+    positive_grad = np.concatenate([[False], (x[1:] >= x[:-1])])
+    negative_grad = np.concatenate([(x[1:] <= x[:-1]), [False]])
+    local_max = positive_grad & negative_grad
+
+    if len(local_max) > 0:
+        x_local_max = x[local_max]
+        i_local_max = indices[local_max]
+
+        # Find index which maximizes x_local_max, but we convert it to the
+        # original index
+        best_index = i_local_max[np.argmax(x_local_max)]
+    else:
+        # There's no local maxima. Just return the maximum.
+        best_index = int(np.argmax(clustering_scores))
+
+    return int(best_index)
+
+
 def _cluster_data(alg, n_cluster, x_train):
     """Function for clustering with multiprocessing purposes"""
     clusterer = alg(n_cluster)
     cluster_labels = clusterer.fit_predict(x_train)
 
-    score = calinski_harabasz_score(x_train, cluster_labels)
+    score = silhouette_score(x_train, cluster_labels)
 
     return clusterer, score
 
@@ -115,7 +152,8 @@ def synchronize_visualization(dataset_name: str, x_train: np.ndarray,
 
     if not os.path.exists(png_path):
         pred_labels = clusterer.predict(x_train)
-        categories = [f'cluster_{c}' for c in pred_labels]
+        all_labels = sorted(set(pred_labels))
+        categories = [f'cluster_{c}' for c in all_labels]
         fig = visualization_fn(x_train, pred_labels, categories)
         fig.write_image(png_path)
 

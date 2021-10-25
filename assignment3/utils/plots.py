@@ -146,7 +146,7 @@ def visualize_fashion_mnist(x_data: np.ndarray, y_data: np.ndarray,
         raise ValueError('x_data of Fashion-MNIST must be 784-dimensional')
 
     tsne = TSNE()
-    transformed = tsne.fit_transform(x_data, y_data)
+    transformed = tsne.fit_transform(x_data)
     assert len(transformed.shape) == 2
 
     fig, ax = plt.subplots()
