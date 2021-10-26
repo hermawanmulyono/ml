@@ -2,6 +2,8 @@ from typing import Optional
 
 import numpy as np
 
+from utils.data import check_input
+
 
 class GaussianRP:
 
@@ -11,7 +13,7 @@ class GaussianRP:
         self.n_features: Optional[int] = None
 
     def fit(self, X: np.ndarray):
-        _check_input(X)
+        check_input(X)
         self.n_features = X.shape[1]
         self.R = _make_proj_matrix(self.n_components, self.n_features)
 
@@ -19,7 +21,7 @@ class GaussianRP:
         assert np.allclose(1.0, np.linalg.norm(self.R, axis=1))
 
     def transform(self, X: np.ndarray):
-        _check_input(X)
+        check_input(X)
 
         assert self.R is not None
 
@@ -39,37 +41,13 @@ class GaussianRP:
         return self.R
 
     def reconstruct(self, X: np.ndarray):
-        _check_input(X)
+        check_input(X)
 
         x_proj = self.transform(X)
         R = self.R
         x_rec = np.dot(x_proj, R)
 
         return x_rec
-
-
-def _check_input(X: np.ndarray):
-    """Checks if input array X is valid
-
-    A valid `X`:
-      - is 2-dimensional
-      - has non-zero length
-
-    Args:
-        X: A feature matrix of shape `(N, n_features)`.
-
-    Returns:
-        None. This function may raise an exception.
-
-    Raises:
-        ValueError if any condition fails.
-
-    """
-    if len(X.shape) != 2:
-        raise ValueError('Input X must be 2-dimensional')
-
-    if len(X) < 1:
-        raise ValueError('Input X must be non-empty')
 
 
 def _make_proj_matrix(n_components: int, n_features: int):

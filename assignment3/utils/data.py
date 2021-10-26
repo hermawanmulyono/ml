@@ -241,3 +241,31 @@ def _get_fashion_mnist_examples(train: bool):
     y_resampled = y[indices]
 
     return x_resampled, y_resampled
+
+
+def check_input(X: np.ndarray):
+    """Checks if input array X is valid
+
+    A valid `X`:
+      - is 2-dimensional
+      - has non-zero length
+      - non-empty features
+
+    Args:
+        X: A feature matrix of shape `(N, n_features)`.
+
+    Returns:
+        None. This function may raise an exception.
+
+    Raises:
+        ValueError if any condition fails.
+
+    """
+    if len(X.shape) != 2:
+        raise ValueError('Input X must be 2-dimensional')
+
+    if len(X) < 1:
+        raise ValueError('Input X must be non-empty')
+
+    if X.shape[1] <= 0:
+        raise ValueError('Input X must have at least a feature.')

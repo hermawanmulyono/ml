@@ -25,3 +25,12 @@ def clustering_visualization_png(dataset_name: str, alg_name: str):
 def reduction_alg_joblib(dataset_name: str, alg_name: str):
     return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}_reduction_alg.joblib'
 
+
+def reconstruction_error_png(dataset_name: str, alg_name: str):
+    return f'{OUTPUT_DIRECTORY}/{dataset_name}_' \
+           f'{alg_name}_reconstruction_error.png'
+
+
+def reduction_json(dataset_name: str, alg_name: str):
+    return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}_reduction.json'
+

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Iterable
 
 import numpy as np
 from plotly import graph_objects as go
@@ -76,24 +76,22 @@ def _add_scatter_dataset3d(fig: go.Figure, x_data, y_data, scatter_alpha: float,
     return fig
 
 
-def clustering_score_plot(n_clusters: List[int],
-                          scores: List[float]) -> go.Figure:
-    """Generates clustering score plot figure
-
-    A clustering score defines how good a clustering is,
-    such as silhouette, or Calinski-Harabasz Index.
+def simple_line_plot(x, y, x_title: str, y_title: str) -> go.Figure:
+    """Generates a simple line plot
 
     Args:
-        n_clusters: List of n_cluster values
-        scores: Clustering scores corresponding
-            to `n_clusters`.
+        x: x-axis data
+        y: y-axis data
+        x_title: x-axis title
+        y_title: y-axis title
 
     Returns:
-        A clustering score plot
+        A go.Figure object with corresponding x and y data.
 
     """
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=n_clusters, y=scores))
+    fig.add_trace(go.Scatter(x=x, y=y))
+    fig.update_layout({'xaxis_title': x_title, 'yaxis_title': y_title})
     return fig
 
 

@@ -31,7 +31,7 @@ def dataset1(n_jobs: int):
         x1_size, x2_size, n_train, n_val, n_test, noise_prob)
     dataset_name = 'Dataset3D'
     run_clustering(dataset_name, x_train, visualize_3d_data, n_jobs)
-    run_dim_reduction(x_train, y_train, sync=True)
+    run_dim_reduction(dataset_name, x_train, y_train, sync=True)
 
 
 def dataset2(n_jobs: int):
