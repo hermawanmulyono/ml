@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from typing import Type, Union, Callable, List, Optional
 from multiprocessing import Pool
@@ -17,7 +18,7 @@ from utils.data import check_input
 from utils.gaussian_rp import GaussianRP
 from utils.outputs import clusterer_joblib, clustering_score_png, \
     clustering_visualization_png, reduction_alg_joblib, \
-    reconstruction_error_png, reduction_json
+    reconstruction_error_png, reduction_json, kurtosis_png
 from utils.plots import simple_line_plot, visualize_3d_data
 
 ClusteringAlg = Union[KMeans, GaussianMixture]
@@ -188,10 +189,10 @@ def synchronize_visualization(dataset_name: str, x_train: np.ndarray,
 def run_dim_reduction(dataset_name: str,
                       x_data: np.ndarray,
                       y_data: np.ndarray,
-                      visualization_fn: VisualizationFunction,
                       sync=False):
 
     _reduce_pca(dataset_name, x_data, y_data, sync)
+    _reduce_ica(dataset_name, x_data, y_data, sync)
 
 
 def _reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
@@ -216,6 +217,8 @@ def _reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
 
     """
 
+    logging.info(f'PCA - {dataset_name}')
+
     check_input(x_data)
 
     alg_name = PCA.__name__
@@ -228,7 +231,7 @@ def _reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
 
     if (not sync) and (not files_exist):
         raise FileNotFoundError(
-            f'{joblib_path} or {rec_error_path} does not exist')
+            f'{joblib_path} or {rec_error_path} or {json_path} does not exist')
 
     if not files_exist:
         # Run PCA
@@ -242,7 +245,6 @@ def _reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
         for n_dims in n_dims_list:
             pca = PCA(n_dims)
             pca.fit(x_data)
-            print(pca.explained_variance_)
             pcas.append(pca)
 
             x_rec = reconstruct_pca(pca, x_data)
@@ -251,7 +253,8 @@ def _reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
 
         # Store PCA joblib. Just pick 2nd dimension.
         assert len(pcas) >= 2
-        joblib.dump(pcas[1], joblib_path)
+        chosen_index = 1
+        joblib.dump(pcas[chosen_index], joblib_path)
 
         # Save reconstruction error plot
         fig = simple_line_plot(n_dims_list, errors, 'n_components',
@@ -259,10 +262,12 @@ def _reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
         fig.write_image(rec_error_path)
 
         # Save raw data as JSON
-        d = {'reconstruction_error': errors,
-             'explained_variance': pcas[-1].explained_variance_}
+        explained_variance = pcas[-1].explained_variance_.tolist()
+        d = {'reconstruction_error': errors[chosen_index],
+             'explained_variance': explained_variance}
+
         with open(json_path, 'w') as fstream:
-            json.dump(d, fstream)
+            json.dump(d, fstream, indent=4)
 
     dim_red_alg: PCA = joblib.load(joblib_path)
     x_reduced = dim_red_alg.transform(x_data)
@@ -276,64 +281,89 @@ def reconstruct_pca(pca: PCA, X: np.ndarray):
     return x_rec
 
 
-def _reduce_ica(x_data: np.ndarray, y_data: np.ndarray, n_dims: int):
-    ica = FastICA(n_dims)
-    x_reduced = ica.fit_transform(x_data)
+def _reduce_ica(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
+                sync: bool):
+    logging.info(f'ICA - {dataset_name}')
 
-    w = ica.components_
-    s_t = np.dot(w, x_data.T)
-    s = s_t.T  # Sources of shape (N, n_dims)
-    print(s[:5])
-    k = kurtosis(s)
-    print(k)
-    k_ave = np.mean(k)
+    check_input(x_data)
 
-    print(k_ave)
+    alg_name = FastICA.__name__
 
-    # Need to choose optimal N
+    joblib_path = reduction_alg_joblib(dataset_name, alg_name)
+    kurtosis_path = kurtosis_png(dataset_name, alg_name)
+    json_path = reduction_json(dataset_name, alg_name)
+    files_exist = os.path.exists(joblib_path) and os.path.exists(
+        kurtosis_path) and os.path.exists(json_path)
 
-    mixing = ica.mixing_
+    if (not sync) and (not files_exist):
+        raise FileNotFoundError(
+            f'{joblib_path} or {kurtosis_path} or {json_path} does not exist')
 
-    categories = sorted(set(y_data))
-    fig = visualize_3d_data(x_data, y_data, [f'{c}' for c in categories])
+    if files_exist:
+        ica: FastICA = joblib.load(joblib_path)
+    else:
+        # Run ICA
+        n_features = x_data.shape[1]
 
-    x_mean = x_data.mean(axis=0)
+        icas = []
+        kurt_scores = []
 
-    for vector in mixing.T:
-        vector = vector / np.linalg.norm(vector) * 5
-        x_arrow = np.array([0, vector[0]]) + x_mean[0]
-        y_arrow = np.array([0, vector[1]]) + x_mean[1]
-        z_arrow = np.array([0, vector[2]]) + x_mean[2]
-        fig.add_trace(
-            go.Scatter3d(x=x_arrow, y=y_arrow, z=z_arrow, mode='lines'))
+        n_dims_list = list(range(1, n_features + 1))
 
-    fig.show()
+        for n_dims in n_dims_list:
+            ica = FastICA(n_dims)
+            ica.fit(x_data)
+            icas.append(ica)
 
-    if n_dims == 1:
-        fig = go.Figure()
-        fig.add_trace(
-            go.Scatter(x=s.flatten(),
-                       y=np.zeros((len(s),)),
-                       mode='markers',
-                       marker={'opacity': 0.5}))
-        fig.show()
-    elif n_dims == 2:
-        fig = go.Figure()
-        fig.add_trace(
-            go.Scatter(x=s[:, 0],
-                       y=s[:, 1],
-                       mode='markers',
-                       marker={'opacity': 0.5}))
-        fig.show()
-    elif n_dims == 3:
-        fig = go.Figure()
-        fig.add_trace(
-            go.Scatter3d(x=s[:, 0],
-                         y=s[:, 1],
-                         z=s[:, 2],
-                         mode='markers',
-                         marker={'opacity': 0.5}))
-        fig.show()
+            # Find kurtosis of the source vectors
+            w = ica.components_
+            s_t = np.dot(w, x_data.T)
+            s = s_t.T  # Sources of shape (N, n_dims)
+            k = kurtosis(s)
+            assert len(k) == n_dims, \
+                f'Expecting kurtosis of length {n_dims}, got {len(k)}'
+
+            k_ave = np.mean(np.abs(k))
+
+            kurt_scores.append(k_ave)
+
+        best_index = np.argmax(kurt_scores)
+        ica = icas[best_index]
+        n_dims = n_dims_list[best_index]
+
+        # Save kurtosis plot
+        fig = simple_line_plot(n_dims_list, kurt_scores,
+                               'n_components', 'kurtosis')
+        fig.write_image()
+
+        # Save raw data as JSON
+        d = {'n_dims': n_dims,
+             'kurtosis': kurt_scores}
+
+        with open(json_path, 'w') as fstream:
+            json.dump(d, fstream, indent=4)
+
+        # Visualize the independent components for Dataset3D
+        if x_data.shape[1] == 3:
+            mixing = ica.mixing_
+
+            categories = sorted(set(y_data))
+            fig = visualize_3d_data(x_data, y_data, [f'{c}' for c in categories])
+
+            x_mean = x_data.mean(axis=0)
+
+            for vector in mixing.T:
+                vector = vector / np.linalg.norm(vector) * 5
+                x_arrow = np.array([0, vector[0]]) + x_mean[0]
+                y_arrow = np.array([0, vector[1]]) + x_mean[1]
+                z_arrow = np.array([0, vector[2]]) + x_mean[2]
+                fig.add_trace(
+                    go.Scatter3d(x=x_arrow, y=y_arrow, z=z_arrow, mode='lines'))
+
+            png_path = clustering_visualization_png(dataset_name, alg_name)
+            fig.write_image(png_path)
+
+    x_reduced = ica.transform(x_data)
 
     return x_reduced, ica
 

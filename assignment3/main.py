@@ -1,4 +1,5 @@
 import argparse
+import logging
 
 import numpy as np
 from sklearn.cluster import KMeans
@@ -37,11 +38,14 @@ def dataset1(n_jobs: int):
 def dataset2(n_jobs: int):
     x_train, y_train, x_val, y_val, x_test, y_test = get_fashion_mnist_data()
     dataset_name = 'Fasihon-MNIST'
+
     run_clustering(dataset_name, x_train, visualize_fashion_mnist, n_jobs)
+    run_dim_reduction(dataset_name, x_train, y_train, sync=True)
 
 
 def main():
     n_jobs = parse_args()
+    logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler()])
     dataset1(n_jobs)
     dataset2(n_jobs)
 
