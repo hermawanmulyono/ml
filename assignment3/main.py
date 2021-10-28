@@ -1,14 +1,10 @@
 import argparse
 import logging
 
-import numpy as np
-from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
-import plotly.graph_objects as go
-
 from utils.data import gen_3d_data, get_fashion_mnist_data
 from utils.plots import visualize_3d_data, visualize_fashion_mnist
-from utils.tasks import run_clustering, run_dim_reduction
+from tasks.dims_reduction import run_dim_reduction
+from tasks.clustering import run_clustering
 
 
 def parse_args():
