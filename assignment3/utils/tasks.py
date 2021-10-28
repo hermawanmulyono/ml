@@ -26,6 +26,14 @@ ClusteringAlg = Union[KMeans, GaussianMixture]
 ClusteringVisualizationFunc = Callable[[np.ndarray, np.ndarray, List[str]],
                                        go.Figure]
 
+# A visualization function arguments are:
+#   1. x_data: Features of shape (N, n_features)
+#   2. y_data: Labels of shape (N, )
+#   3. categories: An ordered list of category names of length n_categories
+#
+# It returns a go.Figure containing the visualization of the data.
+VisualizationFunction = Callable[[np.ndarray, np.ndarray, List[str]], go.Figure]
+
 
 def run_clustering(dataset_name: str,
                    x_train: np.ndarray,
@@ -34,13 +42,23 @@ def run_clustering(dataset_name: str,
     clustering_algs = [KMeans, GaussianMixture]
 
     for alg in clustering_algs:
-        clusterer = sync_clusterer(alg, dataset_name, x_train, n_jobs)
-        synchronize_visualization(dataset_name, x_train, clusterer,
-                                  visualization_fn)
+        clusterer = _sync_clusterer(alg, dataset_name, x_train, n_jobs)
+        _sync_visualization(dataset_name, x_train, clusterer, visualization_fn)
 
 
-def sync_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray,
-                   n_jobs: int):
+def run_dim_reduction(dataset_name: str,
+                      x_data: np.ndarray,
+                      y_data: np.ndarray,
+                      sync=False,
+                      n_jobs=1):
+
+    _reduce_pca(dataset_name, x_data, y_data, sync, n_jobs)
+    _reduce_ica(dataset_name, x_data, y_data, sync, n_jobs)
+    _reduce_rp(dataset_name, x_data, y_data, sync, n_jobs)
+
+
+def _sync_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray,
+                    n_jobs: int):
     """Synchronizes clusterer
 
     To synchronize means to create when a file does not
@@ -150,23 +168,16 @@ def _cluster_data(alg, n_cluster, x_train):
     return clusterer, score
 
 
-# A visualization function arguments are:
-#   1. x_data: Features of shape (N, n_features)
-#   2. y_data: Labels of shape (N, )
-#   3. categories: An ordered list of category names of length n_categories
-#
-# It returns a go.Figure containing the visualization of the data.
-VisualizationFunction = Callable[[np.ndarray, np.ndarray, List[str]], go.Figure]
+def _sync_visualization(dataset_name: str, x_train: np.ndarray,
+                        clusterer: ClusteringAlg,
+                        visualization_fn: VisualizationFunction):
+    """Synchronizes clustering visualization
 
-
-def synchronize_visualization(dataset_name: str, x_train: np.ndarray,
-                              clusterer: ClusteringAlg,
-                              visualization_fn: VisualizationFunction):
-    """
+    If it does not exist, a new figure will be created.
 
     Args:
-        dataset_name:
-        x_train:
+        dataset_name: Dataset name
+        x_train: Training data of shape (N, n_dims)
         clusterer: A clustering algorithm that has been
             fitted.
         visualization_fn: A visualization function. See the
@@ -186,22 +197,14 @@ def synchronize_visualization(dataset_name: str, x_train: np.ndarray,
         fig.write_image(png_path)
 
 
-def run_dim_reduction(dataset_name: str,
-                      x_data: np.ndarray,
-                      y_data: np.ndarray,
-                      sync=False):
-
-    _reduce_pca(dataset_name, x_data, y_data, sync)
-    _reduce_ica(dataset_name, x_data, y_data, sync)
-
-
 def _reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
-                sync: bool):
+                sync: bool, n_jobs):
     """Reduces the `x_data` to `n_dims` dimensions.
 
     This function uses the PCA algorithm.
 
     Args:
+        n_jobs:
         dataset_name: Dataset name
         x_data: An array of shape `(N, original_dims)`
         y_data: The corresponding labels of shape `(N, )`.
@@ -237,19 +240,16 @@ def _reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
         # Run PCA
         n_features = x_data.shape[1]
 
-        pcas = []
-        errors = []
+        n_dims_list = list(range(1, min(64, n_features) + 1))
 
-        n_dims_list = list(range(1, n_features + 1))
+        def args_generator():
+            for n_dims in n_dims_list:
+                yield x_data, n_dims
 
-        for n_dims in n_dims_list:
-            pca = PCA(n_dims)
-            pca.fit(x_data)
-            pcas.append(pca)
+        with Pool(n_jobs) as pool:
+            tuples = pool.starmap(_fit_pca, args_generator())
 
-            x_rec = reconstruct_pca(pca, x_data)
-            error = reconstruction_error(x_data, x_rec)
-            errors.append(error)
+        pcas, errors = zip(*tuples)
 
         # Store PCA joblib. Just pick 2nd dimension.
         assert len(pcas) >= 2
@@ -263,8 +263,10 @@ def _reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
 
         # Save raw data as JSON
         explained_variance = pcas[-1].explained_variance_.tolist()
-        d = {'reconstruction_error': errors[chosen_index],
-             'explained_variance': explained_variance}
+        d = {
+            'reconstruction_error': errors[chosen_index],
+            'explained_variance': explained_variance
+        }
 
         with open(json_path, 'w') as fstream:
             json.dump(d, fstream, indent=4)
@@ -275,14 +277,38 @@ def _reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
     return x_reduced, dim_red_alg
 
 
-def reconstruct_pca(pca: PCA, X: np.ndarray):
+def _fit_pca(x_data, n_dims):
+    """Fits a PCA model
+
+    This function can be parallelized with multiprocessing.
+
+    Args:
+        x_data: (N, n_features) feature array
+        n_dims: Number of PCA dimensions
+
+    Returns:
+        (pca, reconstruction_error) tuple
+
+    """
+    print(f'Running ICA {n_dims} dimensions')
+
+    pca = PCA(n_dims)
+    pca.fit(x_data)
+
+    x_rec = _reconstruct_pca(pca, x_data)
+    reconstruction_error = _reconstruction_error(x_data, x_rec)
+
+    return pca, reconstruction_error
+
+
+def _reconstruct_pca(pca: PCA, X: np.ndarray):
     x_proj = pca.transform(X)
     x_rec = np.dot(x_proj, pca.components_) + pca.mean_
     return x_rec
 
 
 def _reduce_ica(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
-                sync: bool):
+                sync: bool, n_jobs: int):
     logging.info(f'ICA - {dataset_name}')
 
     check_input(x_data)
@@ -305,40 +331,32 @@ def _reduce_ica(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
         # Run ICA
         n_features = x_data.shape[1]
 
-        icas = []
-        kurt_scores = []
+        n_dims_list = list(range(1, min(64, n_features) + 1))
 
-        n_dims_list = list(range(1, n_features + 1))
+        def args_generator():
+            for _n_dims in n_dims_list:
+                yield x_data, _n_dims
 
-        for n_dims in n_dims_list:
-            ica = FastICA(n_dims)
-            ica.fit(x_data)
-            icas.append(ica)
+        with Pool(n_jobs) as pool:
+            tuples = pool.starmap(_fit_ica, args_generator())
 
-            # Find kurtosis of the source vectors
-            w = ica.components_
-            s_t = np.dot(w, x_data.T)
-            s = s_t.T  # Sources of shape (N, n_dims)
-            k = kurtosis(s)
-            assert len(k) == n_dims, \
-                f'Expecting kurtosis of length {n_dims}, got {len(k)}'
+        icas, mean_abs_kurtosis = zip(*tuples)
 
-            k_ave = np.mean(np.abs(k))
-
-            kurt_scores.append(k_ave)
-
-        best_index = np.argmax(kurt_scores)
+        # Find the n_dims with highest kurtosis
+        best_index = np.argmax(mean_abs_kurtosis)
         ica = icas[best_index]
         n_dims = n_dims_list[best_index]
 
+        # Store ICA joblib
+        joblib.dump(ica, joblib_path)
+
         # Save kurtosis plot
-        fig = simple_line_plot(n_dims_list, kurt_scores,
-                               'n_components', 'kurtosis')
-        fig.write_image()
+        fig = simple_line_plot(n_dims_list, mean_abs_kurtosis, 'n_components',
+                               'kurtosis')
+        fig.write_image(kurtosis_path)
 
         # Save raw data as JSON
-        d = {'n_dims': n_dims,
-             'kurtosis': kurt_scores}
+        d = {'n_dims': n_dims, 'abs_kurtosis': mean_abs_kurtosis}
 
         with open(json_path, 'w') as fstream:
             json.dump(d, fstream, indent=4)
@@ -348,7 +366,8 @@ def _reduce_ica(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
             mixing = ica.mixing_
 
             categories = sorted(set(y_data))
-            fig = visualize_3d_data(x_data, y_data, [f'{c}' for c in categories])
+            fig = visualize_3d_data(x_data, y_data,
+                                    [f'{c}' for c in categories])
 
             x_mean = x_data.mean(axis=0)
 
@@ -368,23 +387,120 @@ def _reduce_ica(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
     return x_reduced, ica
 
 
-def _reduce_rp(x_data: np.ndarray, y_data: np.ndarray, n_dims: int):
+def _fit_ica(x_data: np.ndarray, n_dims: int):
+    """Fits an ICA model
+
+    This function can be parallelized with multiprocessing.
+
+    Args:
+        x_data: (N, n_features) feature array
+        n_dims: Number of ICA dimensions
+
+    Returns:
+        (ica, mean_abs_kurtosis) tuple
+
+    """
+    print(f'Running ICA {n_dims} dimensions')
+
+    ica = FastICA(n_dims, max_iter=1000)
+    ica.fit(x_data)
+
+    # Find kurtosis of the source vectors
+    w = ica.components_
+    s_t = np.dot(w, x_data.T)
+    s = s_t.T  # Sources of shape (N, n_dims)
+    k = kurtosis(s)
+    assert len(k) == n_dims, \
+        f'Expecting kurtosis of length {n_dims}, got {len(k)}'
+
+    mean_abs_kurtosis = float(np.mean(np.abs(k)))
+
+    return ica, mean_abs_kurtosis
+
+
+def _reduce_rp(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
+                sync: bool, n_jobs):
+    logging.info(f'Random Projection - {dataset_name}')
+
+    check_input(x_data)
+
+    alg_name = GaussianRP.__name__
+
+    joblib_path = reduction_alg_joblib(dataset_name, alg_name)
+    rec_error_path = reconstruction_error_png(dataset_name, alg_name)
+    json_path = reduction_json(dataset_name, alg_name)
+
+    files_exist = os.path.exists(joblib_path) and os.path.exists(
+        rec_error_path) and os.path.exists(json_path)
+
+    if (not sync) and (not files_exist):
+        raise FileNotFoundError(
+            f'{joblib_path} or {rec_error_path} or {json_path} does not exist')
+
+    if not files_exist:
+        # Run GaussianRP
+        n_features = x_data.shape[1]
+
+        n_dims_list = list(range(1, n_features + 1))
+
+        def args_generator():
+            for n_dims in n_dims_list:
+                yield x_data, n_dims
+
+        with Pool(n_jobs) as pool:
+            tuples = pool.starmap(_fit_rp, args_generator())
+
+        rps, errors = zip(*tuples)
+
+        # Store RP joblib. Just pick the 2nd dimension.
+        assert len(rps) >= 2
+        chosen_index = 1
+        joblib.dump(rps[chosen_index], joblib_path)
+
+        # Save reconstruction error plot
+        fig = simple_line_plot(n_dims_list, errors, 'n_components',
+                               'reconstruction_error')
+        fig.write_image(rec_error_path)
+
+        # Save raw data as JSON
+        d = {
+            'reconstruction_error': errors[chosen_index]
+        }
+
+        with open(json_path, 'w') as fstream:
+            json.dump(d, fstream, indent=4)
+
+    dim_red_alg: GaussianRP = joblib.load(joblib_path)
+    x_reduced = dim_red_alg.transform(x_data)
+
+    return x_reduced, dim_red_alg
+
+
+def _fit_rp(x_data, n_dims):
+    """Fits a random projection model
+
+    This function can be parallelized with multiprocessing.
+
+    Args:
+        x_data: (N, n_features) feature array
+        n_dims: Number of random projection vectors
+
+    Returns:
+        (rp, reconstruction_error) tuple
+
+    """
+    print(f'Running RP {n_dims} dimensions')
+
     rp = GaussianRP(n_dims)
-    x_reduced = rp.fit_transform(x_data)
+    rp.fit(x_data)
 
     x_rec = rp.reconstruct(x_data)
+    reconstruction_error = _reconstruction_error(x_data, x_rec)
 
-    error = reconstruction_error(x_data, x_rec)
-    print(f'error {error}')
-
-    categories = sorted(set(y_data))
-    fig = visualize_3d_data(x_rec, y_data, [f'{c}' for c in categories])
-    fig.show()
-
-    return x_reduced, rp
+    return rp, reconstruction_error
 
 
-def reconstruction_error(x_data: np.ndarray, x_rec: np.ndarray):
+def _reconstruction_error(x_data: np.ndarray, x_rec: np.ndarray):
     delta = np.linalg.norm(x_data - x_rec, axis=1)
     error = np.mean(np.power(delta, 2))
     return error

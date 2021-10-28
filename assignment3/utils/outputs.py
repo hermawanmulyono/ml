@@ -36,5 +36,5 @@ def reduction_json(dataset_name: str, alg_name: str):
 
 
 def kurtosis_png(dataset_name: str, alg_name: str):
-    return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}_kurtosis.json'
+    return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}_kurtosis.png'
 

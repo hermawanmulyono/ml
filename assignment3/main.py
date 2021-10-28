@@ -32,7 +32,7 @@ def dataset1(n_jobs: int):
         x1_size, x2_size, n_train, n_val, n_test, noise_prob)
     dataset_name = 'Dataset3D'
     run_clustering(dataset_name, x_train, visualize_3d_data, n_jobs)
-    run_dim_reduction(dataset_name, x_train, y_train, sync=True)
+    run_dim_reduction(dataset_name, x_train, y_train, sync=True, n_jobs=n_jobs)
 
 
 def dataset2(n_jobs: int):
@@ -40,7 +40,7 @@ def dataset2(n_jobs: int):
     dataset_name = 'Fasihon-MNIST'
 
     run_clustering(dataset_name, x_train, visualize_fashion_mnist, n_jobs)
-    run_dim_reduction(dataset_name, x_train, y_train, sync=True)
+    run_dim_reduction(dataset_name, x_train, y_train, sync=True, n_jobs=n_jobs)
 
 
 def main():
