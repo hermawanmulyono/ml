@@ -14,8 +14,9 @@ def visualize_3d_data(x_data: np.ndarray, y_data: np.ndarray,
 
     Args:
         x_data: A (num_examples, 3) array.
-        y_data: A (num_examples, ) array of labels corresponding to `x_data`.
-        categories: Category names of the data, ordered by indices
+        y_data: A (num_examples, ) array of labels
+            corresponding to `x_data`. categories: Category
+            names of the data, ordered by indices
 
     Returns:
         A plotly figure object
@@ -29,7 +30,51 @@ def visualize_3d_data(x_data: np.ndarray, y_data: np.ndarray,
                                  scatter_alpha=0.5,
                                  scatter_size=4,
                                  categories=categories)
-    fig.update_layout({'xaxis_title': 'x1', 'yaxis_title': 'x2'})
+    fig.update_layout({'xaxis_title': 'x1',
+                       'yaxis_title': 'x2',
+                       'zaxis_title': 'x3'})
+
+    return fig
+
+
+def visualize_reduced_dataset3d(x_data: np.ndarray, y_data: np.ndarray,
+                      categories: List[str]) -> go.Figure:
+    """Visualizes 3D data
+
+    Args:
+        x_data: A (num_examples, n_dims) array, where
+            `n_dims <= 3`.
+        y_data: A (num_examples, ) array of labels
+            corresponding to `x_data`. categories: Category
+            names of the data, ordered by indices
+
+    Returns:
+        A plotly figure object
+
+    """
+
+    fig = go.Figure()
+
+    n_dims = x_data.shape[1]
+    if n_dims < 3:
+        padding = 3 - n_dims
+        zeros = np.zeros((len(x_data), padding))
+        x_data = np.concatenate([x_data, zeros], axis=1)
+
+    fig = _add_scatter_dataset3d(fig,
+                                 x_data,
+                                 y_data,
+                                 scatter_alpha=0.5,
+                                 scatter_size=4,
+                                 categories=categories)
+
+    updated_layout = {'xaxis_title': 'x1'}
+    if n_dims >= 2:
+        updated_layout['yaxis_title'] = 'x2'
+    if n_dims == 3:
+        updated_layout['zaxis_title'] = 'x3'
+
+    fig.update_layout(updated_layout)
 
     return fig
 
@@ -40,8 +85,8 @@ def _add_scatter_dataset3d(fig: go.Figure, x_data, y_data, scatter_alpha: float,
 
     Args:
         fig: A Figure object
-        x_data: Dataset2D features
-        y_data: Dataset2D labels
+        x_data: Dataset3D features
+        y_data: Dataset3D labels
         scatter_alpha: Transparency
         scatter_size: Scatter size
         categories: Category names of the data, ordered by indices
@@ -56,6 +101,9 @@ def _add_scatter_dataset3d(fig: go.Figure, x_data, y_data, scatter_alpha: float,
             (max(possible_labels) < len(categories))):
         raise ValueError(
             f'Possible labels are not consistent with the labels {categories}')
+
+    if x_data.shape[1] != 3:
+        raise ValueError('Invalid number of dimensions')
 
     for label in possible_labels:
         category_name = categories[label]

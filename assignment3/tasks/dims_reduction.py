@@ -25,20 +25,19 @@ def run_dim_reduction(dataset_name: str,
                       sync=False,
                       n_jobs=1):
 
-    _reduce_pca(dataset_name, x_data, y_data, sync, n_jobs)
-    _reduce_ica(dataset_name, x_data, y_data, sync, n_jobs)
-    _reduce_rp(dataset_name, x_data, y_data, sync, n_jobs)
-    _reduce_dt(dataset_name, x_data, y_data, sync, n_jobs)
+    reduce_pca(dataset_name, x_data, y_data, sync, n_jobs)
+    reduce_ica(dataset_name, x_data, y_data, sync, n_jobs)
+    reduce_rp(dataset_name, x_data, y_data, sync, n_jobs)
+    reduce_dt(dataset_name, x_data, y_data, sync, n_jobs)
 
 
-def _reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
-                sync: bool, n_jobs):
+def reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
+               sync: bool, n_jobs):
     """Reduces the `x_data` to `n_dims` dimensions.
 
     This function uses the PCA algorithm.
 
     Args:
-        n_jobs:
         dataset_name: Dataset name
         x_data: An array of shape `(N, original_dims)`
         y_data: The corresponding labels of shape `(N, )`.
@@ -48,9 +47,13 @@ def _reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
             includes synchronizing necessary plots. If
             `False`, it expects that there is an existing
             serialized PCA object.
+        n_jobs: Number of Python processes to use in
+            parallel.
 
     Returns:
-        `x_reduced`, which is an array of shape `(N, n_dims)`
+        `(x_reduced, pca)` tuple. `x_reduced` is the
+            transformed `x_data`, while `pca` is the
+            corresponding PCA object.
 
     """
 
@@ -141,8 +144,8 @@ def _reconstruct_pca(pca: PCA, X: np.ndarray):
     return x_rec
 
 
-def _reduce_ica(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
-                sync: bool, n_jobs: int):
+def reduce_ica(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
+               sync: bool, n_jobs: int):
     logging.info(f'ICA - {dataset_name}')
 
     check_input(x_data)
@@ -252,8 +255,8 @@ def _fit_ica(x_data: np.ndarray, n_dims: int):
     return ica, mean_abs_kurtosis
 
 
-def _reduce_rp(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
-                sync: bool, n_jobs):
+def reduce_rp(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
+              sync: bool, n_jobs):
     logging.info(f'Random Projection - {dataset_name}')
 
     check_input(x_data)
@@ -348,8 +351,8 @@ def _reconstruction_error(x_data: np.ndarray, x_rec: np.ndarray):
     return error
 
 
-def _reduce_dt(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
-               sync: bool, n_jobs):
+def reduce_dt(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
+              sync: bool, n_jobs):
 
     logging.info(f'DT - {dataset_name}')
 

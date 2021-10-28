@@ -17,7 +17,6 @@ ClusteringAlg = Union[KMeans, GaussianMixture]
 ClusteringVisualizationFunc = Callable[[np.ndarray, np.ndarray, List[str]],
                                        go.Figure]
 
-
 # A visualization function arguments are:
 #   1. x_data: Features of shape (N, n_features)
 #   2. y_data: Labels of shape (N, )
@@ -28,14 +27,15 @@ VisualizationFunction = Callable[[np.ndarray, np.ndarray, List[str]], go.Figure]
 
 
 def run_clustering(dataset_name: str,
-                   x_train: np.ndarray,
+                   x_data: np.ndarray,
                    visualization_fn: ClusteringVisualizationFunc,
                    n_jobs: int = 1):
     clustering_algs = [KMeans, GaussianMixture]
 
     for alg in clustering_algs:
-        clusterer = _sync_clusterer(alg, dataset_name, x_train, n_jobs)
-        _sync_clustering_visualization(dataset_name, x_train, clusterer, visualization_fn)
+        clusterer = _sync_clusterer(alg, dataset_name, x_data, n_jobs)
+        _sync_clustering_visualization(dataset_name, x_data, clusterer,
+                                       visualization_fn)
 
 
 def _sync_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray,

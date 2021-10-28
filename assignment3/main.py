@@ -1,8 +1,10 @@
 import argparse
 import logging
 
+from tasks.reduction_and_clustering import run_reduction_and_clustering
 from utils.data import gen_3d_data, get_fashion_mnist_data
-from utils.plots import visualize_3d_data, visualize_fashion_mnist
+from utils.plots import visualize_3d_data, visualize_fashion_mnist, \
+    visualize_reduced_dataset3d
 from tasks.dims_reduction import run_dim_reduction
 from tasks.clustering import run_clustering
 
@@ -29,6 +31,8 @@ def dataset1(n_jobs: int):
     dataset_name = 'Dataset3D'
     run_clustering(dataset_name, x_train, visualize_3d_data, n_jobs)
     run_dim_reduction(dataset_name, x_train, y_train, sync=True, n_jobs=n_jobs)
+    run_reduction_and_clustering(dataset_name, x_train, y_train,
+                                 visualize_reduced_dataset3d, n_jobs)
 
 
 def dataset2(n_jobs: int):
