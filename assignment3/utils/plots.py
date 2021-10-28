@@ -190,3 +190,26 @@ def visualize_fashion_mnist(x_data: np.ndarray, y_data: np.ndarray,
     adapter_figure = MatplotlibAdapter(fig, ax)
 
     return adapter_figure
+
+
+def feature_importance_chart(feature_importances: np.ndarray):
+    """Feature importance bar chart
+
+    The bar plot shows the feature importance scores,
+    sorted from the highest to lowest.
+
+    Args:
+        feature_importances:
+
+    Returns:
+        A go.Figure() object containing the bar chart.
+
+    """
+
+    sorted_importances = -np.sort(-feature_importances)
+    x = np.arange(0, len(feature_importances))
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(x=x, y=sorted_importances))
+    return fig
+

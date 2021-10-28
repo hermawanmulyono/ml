@@ -23,7 +23,8 @@ class GaussianRP:
     def transform(self, X: np.ndarray):
         check_input(X)
 
-        assert self.R is not None
+        if self.R is None:
+            raise RuntimeError('fit() must be called before transform()')
 
         if X.shape[1] != self.R.shape[1]:
             raise ValueError(f'Invalid X shape, expecting (N, {self.n_features})')

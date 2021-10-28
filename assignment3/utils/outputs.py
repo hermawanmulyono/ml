@@ -38,3 +38,7 @@ def reduction_json(dataset_name: str, alg_name: str):
 def kurtosis_png(dataset_name: str, alg_name: str):
     return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}_kurtosis.png'
 
+
+def feature_importances_png(dataset_name: str, alg_name: str):
+    return f'{OUTPUT_DIRECTORY}/{dataset_name}_' \
+           f'{alg_name}_feature_importances.png'

@@ -13,13 +13,17 @@ from sklearn.mixture import GaussianMixture
 from sklearn.metrics import silhouette_score, calinski_harabasz_score
 from scipy.stats import kurtosis
 import plotly.graph_objects as go
+from sklearn.tree import DecisionTreeClassifier
 
 from utils.data import check_input
+from utils.dtfilter import DTFilter
 from utils.gaussian_rp import GaussianRP
 from utils.outputs import clusterer_joblib, clustering_score_png, \
     clustering_visualization_png, reduction_alg_joblib, \
-    reconstruction_error_png, reduction_json, kurtosis_png
-from utils.plots import simple_line_plot, visualize_3d_data
+    reconstruction_error_png, reduction_json, kurtosis_png, \
+    feature_importances_png
+from utils.plots import simple_line_plot, visualize_3d_data, \
+    feature_importance_chart
 
 ClusteringAlg = Union[KMeans, GaussianMixture]
 
@@ -55,6 +59,7 @@ def run_dim_reduction(dataset_name: str,
     _reduce_pca(dataset_name, x_data, y_data, sync, n_jobs)
     _reduce_ica(dataset_name, x_data, y_data, sync, n_jobs)
     _reduce_rp(dataset_name, x_data, y_data, sync, n_jobs)
+    _reduce_dt(dataset_name, x_data, y_data, sync, n_jobs)
 
 
 def _sync_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray,
@@ -514,5 +519,46 @@ def _reconstruction_error(x_data: np.ndarray, x_rec: np.ndarray):
     return error
 
 
-def _reduce_dt(x_data: np.ndarray, y_data: np.ndarray, n_dims: int):
-    pass
+def _reduce_dt(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
+               sync: bool, n_jobs):
+
+    logging.info(f'DT - {dataset_name}')
+
+    check_input(x_data)
+
+    alg_name = DTFilter.__name__
+
+    joblib_path = reduction_alg_joblib(dataset_name, alg_name)
+    bar_chart_path = feature_importances_png(dataset_name, alg_name)
+    json_path = reduction_json(dataset_name, alg_name)
+
+    files_exist = os.path.exists(joblib_path) and os.path.exists(
+        bar_chart_path) and os.path.exists(json_path)
+
+    if (not sync) and (not files_exist):
+        raise FileNotFoundError(f'{joblib_path} or {bar_chart_path} or '
+                                f'{json_path} does not exist')
+
+    if not files_exist:
+        dt_filter = DTFilter()
+        dt_filter.fit(x_data, y_data)
+
+        # Save DTFilter joblib
+        joblib.dump(dt_filter, joblib_path)
+
+        # Save bar chart
+        importances = dt_filter.dt.feature_importances_
+        fig = feature_importance_chart(importances)
+        fig.write_image(bar_chart_path)
+
+        # Save JSON file
+        d = {'n_dims': len(dt_filter.selected_features),
+             'selected_features': dt_filter.selected_features}
+
+        with open(json_path, 'w') as fstream:
+            json.dump(d, fstream, indent=4)
+
+    dt_filter = joblib.load(joblib_path)
+    x_transformed = dt_filter.transform(x_data)
+
+    return x_transformed, dt_filter
