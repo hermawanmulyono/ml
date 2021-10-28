@@ -501,10 +501,18 @@ def _fit_rp(x_data, n_dims):
 
 
 def _reconstruction_error(x_data: np.ndarray, x_rec: np.ndarray):
-    delta = np.linalg.norm(x_data - x_rec, axis=1)
+
+    abs_data = np.linalg.norm(x_data, axis=1)
+    abs_rec = np.linalg.norm(x_rec, axis=1)
+
+    if not np.all(abs_data >= abs_rec - 1E-5):
+        raise ValueError('Reconstructed vector must be smaller than the '
+                         'original')
+
+    delta = np.linalg.norm(x_data - x_rec, axis=1) / abs_data
     error = np.mean(np.power(delta, 2))
     return error
 
 
-def _reduce_forward(x_data: np.ndarray, y_data: np.ndarray, n_dims: int):
+def _reduce_dt(x_data: np.ndarray, y_data: np.ndarray, n_dims: int):
     pass
