@@ -10,7 +10,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 
 def visualize_3d_data(x_data: np.ndarray, y_data: np.ndarray,
-                      categories: List[str]) -> go.Figure:
+                      categories: List[str], scatter_alpha: float = 0.5) ->go.Figure:
     """Visualizes 3D data
 
     Args:
@@ -18,6 +18,9 @@ def visualize_3d_data(x_data: np.ndarray, y_data: np.ndarray,
         y_data: A (num_examples, ) array of labels
             corresponding to `x_data`. categories: Category
             names of the data, ordered by indices
+        categories: The category names in the dataset
+        scatter_alpha: Marker alpha value. 0 is solid, 1 is
+            fully transparent.
 
     Returns:
         A plotly figure object
@@ -28,7 +31,7 @@ def visualize_3d_data(x_data: np.ndarray, y_data: np.ndarray,
     fig = _add_scatter_dataset3d(fig,
                                  x_data,
                                  y_data,
-                                 scatter_alpha=0.5,
+                                 scatter_alpha=scatter_alpha,
                                  scatter_size=4,
                                  categories=categories)
     fig.update_layout(scene={
@@ -274,7 +277,8 @@ def visualize_dataset3d_vectors(vectors: np.ndarray, x_data: np.ndarray,
     scale = np.max(np.max(x_data, axis=0) - np.min(x_data, axis=0))
 
     categories = sorted(set(y_data))
-    fig = visualize_3d_data(x_data, y_data, [f'{c}' for c in categories])
+    fig = visualize_3d_data(x_data, y_data, [f'{c}' for c in categories],
+                            scatter_alpha=0.9)
 
     x_mean = x_data.mean(axis=0)
 

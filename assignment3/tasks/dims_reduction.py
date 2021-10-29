@@ -295,6 +295,8 @@ def reduce_rp(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
 
         n_dims_list = list(range(1, n_features + 1))
 
+        # TODO: Run GaussianRP many times
+
         def args_generator():
             for n_dims in n_dims_list:
                 yield x_data, n_dims
