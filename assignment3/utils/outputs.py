@@ -40,6 +40,11 @@ def reduction_json(dataset_name: str, alg_name: str):
     return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}_reduction.json'
 
 
+def vector_visualization_png(dataset_name: str, alg_name: str):
+    return f'{OUTPUT_DIRECTORY}/{dataset_name}_' \
+           f'{alg_name}_vector_visualization.png'
+
+
 def kurtosis_png(dataset_name: str, alg_name: str):
     return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}_kurtosis.png'
 

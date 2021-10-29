@@ -4,14 +4,17 @@ import logging
 from tasks.reduction_and_clustering import run_reduction_and_clustering
 from utils.data import gen_3d_data, get_fashion_mnist_data
 from utils.plots import visualize_3d_data, visualize_fashion_mnist, \
-    visualize_reduced_dataset3d
+    visualize_reduced_dataset3d, visualize_dataset3d_vectors, \
+    visualize_fashionmnist_vectors
 from tasks.dims_reduction import run_dim_reduction
 from tasks.clustering import run_clustering
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-n', '--n_jobs', default=1,
+    parser.add_argument('-n',
+                        '--n_jobs',
+                        default=1,
                         type=int,
                         help='Number of Python processes to use')
     args = parser.parse_args()
@@ -30,9 +33,15 @@ def dataset1(n_jobs: int):
         x1_size, x2_size, n_train, n_val, n_test, noise_prob)
     dataset_name = 'Dataset3D'
     run_clustering(dataset_name, x_train, y_train, visualize_3d_data, n_jobs)
-    run_dim_reduction(dataset_name, x_train, y_train, sync=True, n_jobs=n_jobs)
+    run_dim_reduction(dataset_name,
+                      x_train,
+                      y_train,
+                      visualize_dataset3d_vectors,
+                      sync=True,
+                      n_jobs=n_jobs)
     run_reduction_and_clustering(dataset_name, x_train, y_train,
-                                 visualize_reduced_dataset3d, n_jobs)
+                                 visualize_reduced_dataset3d,
+                                 visualize_dataset3d_vectors, n_jobs)
 
 
 def dataset2(n_jobs: int):
@@ -41,7 +50,12 @@ def dataset2(n_jobs: int):
 
     run_clustering(dataset_name, x_train, y_train, visualize_fashion_mnist,
                    n_jobs)
-    run_dim_reduction(dataset_name, x_train, y_train, sync=True, n_jobs=n_jobs)
+    run_dim_reduction(dataset_name,
+                      x_train,
+                      y_train,
+                      visualize_fashionmnist_vectors,
+                      sync=True,
+                      n_jobs=n_jobs)
 
 
 def main():

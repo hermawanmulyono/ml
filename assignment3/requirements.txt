@@ -7,3 +7,5 @@ plotly
 progressbar2
 scikit-image
 kaleido
+matplotlib
+pandas

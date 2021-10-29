@@ -11,11 +11,13 @@ class GaussianRP:
         self.R: Optional[np.ndarray] = None
         self.n_components = n_components
         self.n_features: Optional[int] = None
+        self.mean: Optional[np.ndarray] = None
 
     def fit(self, X: np.ndarray):
         check_input(X)
         self.n_features = X.shape[1]
         self.R = _make_proj_matrix(self.n_components, self.n_features)
+        self.mean = np.mean(X, axis=0)
 
         assert self.R.shape == (self.n_components, self.n_features)
         assert np.allclose(1.0, np.linalg.norm(self.R, axis=1))
@@ -29,7 +31,8 @@ class GaussianRP:
         if X.shape[1] != self.R.shape[1]:
             raise ValueError(f'Invalid X shape, expecting (N, {self.n_features})')
 
-        x_proj = np.dot(X, self.R.T)
+        x_centered = X - self.mean
+        x_proj = np.dot(x_centered, self.R.T)
 
         return x_proj
 
@@ -41,12 +44,16 @@ class GaussianRP:
     def components_(self):
         return self.R
 
+    @property
+    def mean_(self):
+        return self.mean
+
     def reconstruct(self, X: np.ndarray):
         check_input(X)
 
         x_proj = self.transform(X)
         R = self.R
-        x_rec = np.dot(x_proj, R)
+        x_rec = np.dot(x_proj, R) + self.mean
 
         return x_rec
 

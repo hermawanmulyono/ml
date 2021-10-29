@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from multiprocessing import Pool
+from typing import Callable
 
 import joblib
 import numpy as np
@@ -13,26 +14,35 @@ from utils.data import check_input
 from utils.dtfilter import DTFilter
 from utils.gaussian_rp import GaussianRP
 from utils.outputs import reduction_alg_joblib, reconstruction_error_png, \
-    reduction_json, kurtosis_png, clustering_visualization_png, \
-    feature_importances_png
-from utils.plots import simple_line_plot, visualize_3d_data, \
-    feature_importance_chart
+    reduction_json, kurtosis_png, feature_importances_png, \
+    vector_visualization_png
+from utils.plots import simple_line_plot, feature_importance_chart
+
+# Vector visualization function
+VectorVisualizationFunction = Callable[[np.ndarray, np.ndarray, np.ndarray],
+                                       go.Figure]
 
 
 def run_dim_reduction(dataset_name: str,
                       x_data: np.ndarray,
                       y_data: np.ndarray,
+                      vector_visualization_fn: VectorVisualizationFunction,
                       sync=False,
                       n_jobs=1):
 
-    reduce_pca(dataset_name, x_data, y_data, sync, n_jobs)
-    reduce_ica(dataset_name, x_data, y_data, sync, n_jobs)
-    reduce_rp(dataset_name, x_data, y_data, sync, n_jobs)
-    reduce_dt(dataset_name, x_data, y_data, sync, n_jobs)
+    reduce_pca(dataset_name, x_data, y_data, sync, n_jobs,
+               vector_visualization_fn)
+    reduce_ica(dataset_name, x_data, y_data, sync, n_jobs,
+               vector_visualization_fn)
+    reduce_rp(dataset_name, x_data, y_data, sync, n_jobs,
+              vector_visualization_fn)
+    reduce_dt(dataset_name, x_data, y_data, sync, n_jobs,
+              vector_visualization_fn)
 
 
 def reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
-               sync: bool, n_jobs):
+               sync: bool, n_jobs,
+               vector_visualization_fn: VectorVisualizationFunction):
     """Reduces the `x_data` to `n_dims` dimensions.
 
     This function uses the PCA algorithm.
@@ -49,6 +59,8 @@ def reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
             serialized PCA object.
         n_jobs: Number of Python processes to use in
             parallel.
+        vector_visualization_fn: Vector visualization 
+            function.
 
     Returns:
         `(x_reduced, pca)` tuple. `x_reduced` is the
@@ -66,8 +78,12 @@ def reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
     joblib_path = reduction_alg_joblib(dataset_name, alg_name)
     rec_error_path = reconstruction_error_png(dataset_name, alg_name)
     json_path = reduction_json(dataset_name, alg_name)
-    files_exist = os.path.exists(joblib_path) and os.path.exists(
-        rec_error_path) and os.path.exists(json_path)
+    vector_viz_path = vector_visualization_png(dataset_name, alg_name)
+
+    files_exist = all([
+        os.path.exists(p)
+        for p in [joblib_path, rec_error_path, json_path, vector_viz_path]
+    ])
 
     if (not sync) and (not files_exist):
         raise FileNotFoundError(
@@ -83,15 +99,22 @@ def reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
             for n_dims in n_dims_list:
                 yield x_data, n_dims
 
-        with Pool(n_jobs) as pool:
-            tuples = pool.starmap(_fit_pca, args_generator())
+        # with Pool(n_jobs) as pool:
+        #     tuples = pool.starmap(_fit_pca, args_generator())
+
+        tuples = [_fit_pca(*args) for args in args_generator()]
 
         pcas, errors = zip(*tuples)
 
-        # Store PCA joblib. Just pick 2nd dimension.
-        assert len(pcas) >= 2
+        # Store PCA joblib. Just pick at least 0.95 explained variance.
+        pca, error = _fit_pca(x_data, 0.95)
+
         chosen_index = 1
-        joblib.dump(pcas[chosen_index], joblib_path)
+        joblib.dump(pca, joblib_path)
+
+        # Store the vector visualization
+        fig = vector_visualization_fn(pca.components_, x_data, y_data)
+        fig.write_image(vector_viz_path)
 
         # Save reconstruction error plot
         fig = simple_line_plot(n_dims_list, errors, 'n_components',
@@ -133,7 +156,8 @@ def _fit_pca(x_data, n_dims):
     pca.fit(x_data)
 
     x_rec = _reconstruct_pca(pca, x_data)
-    reconstruction_error = _reconstruction_error(x_data, x_rec)
+    reconstruction_error = _reconstruction_error(x_data - pca.mean_,
+                                                 x_rec - pca.mean_)
 
     return pca, reconstruction_error
 
@@ -145,7 +169,8 @@ def _reconstruct_pca(pca: PCA, X: np.ndarray):
 
 
 def reduce_ica(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
-               sync: bool, n_jobs: int):
+               sync: bool, n_jobs: int,
+               vector_visualization_fn: VectorVisualizationFunction):
     logging.info(f'ICA - {dataset_name}')
 
     check_input(x_data)
@@ -155,8 +180,12 @@ def reduce_ica(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
     joblib_path = reduction_alg_joblib(dataset_name, alg_name)
     kurtosis_path = kurtosis_png(dataset_name, alg_name)
     json_path = reduction_json(dataset_name, alg_name)
-    files_exist = os.path.exists(joblib_path) and os.path.exists(
-        kurtosis_path) and os.path.exists(json_path)
+    vector_viz_path = vector_visualization_png(dataset_name, alg_name)
+
+    files_exist = all([
+        os.path.exists(p)
+        for p in [joblib_path, kurtosis_path, json_path, vector_viz_path]
+    ])
 
     if (not sync) and (not files_exist):
         raise FileNotFoundError(
@@ -198,26 +227,10 @@ def reduce_ica(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
         with open(json_path, 'w') as fstream:
             json.dump(d, fstream, indent=4)
 
-        # Visualize the independent components for Dataset3D
-        if x_data.shape[1] == 3:
-            mixing = ica.mixing_
-
-            categories = sorted(set(y_data))
-            fig = visualize_3d_data(x_data, y_data,
-                                    [f'{c}' for c in categories])
-
-            x_mean = x_data.mean(axis=0)
-
-            for vector in mixing.T:
-                vector = vector / np.linalg.norm(vector) * 5
-                x_arrow = np.array([0, vector[0]]) + x_mean[0]
-                y_arrow = np.array([0, vector[1]]) + x_mean[1]
-                z_arrow = np.array([0, vector[2]]) + x_mean[2]
-                fig.add_trace(
-                    go.Scatter3d(x=x_arrow, y=y_arrow, z=z_arrow, mode='lines'))
-
-            png_path = clustering_visualization_png(dataset_name, alg_name)
-            fig.write_image(png_path)
+        # Visualize the independent components
+        mixing_vectors = ica.mixing_.T
+        fig = vector_visualization_fn(mixing_vectors, x_data, y_data)
+        fig.write_image(vector_viz_path)
 
     x_reduced = ica.transform(x_data)
 
@@ -256,7 +269,8 @@ def _fit_ica(x_data: np.ndarray, n_dims: int):
 
 
 def reduce_rp(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
-              sync: bool, n_jobs):
+              sync: bool, n_jobs: int,
+              vector_visualization_fn: VectorVisualizationFunction):
     logging.info(f'Random Projection - {dataset_name}')
 
     check_input(x_data)
@@ -300,9 +314,7 @@ def reduce_rp(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
         fig.write_image(rec_error_path)
 
         # Save raw data as JSON
-        d = {
-            'reconstruction_error': errors[chosen_index]
-        }
+        d = {'reconstruction_error': errors[chosen_index]}
 
         with open(json_path, 'w') as fstream:
             json.dump(d, fstream, indent=4)
@@ -332,7 +344,8 @@ def _fit_rp(x_data, n_dims):
     rp.fit(x_data)
 
     x_rec = rp.reconstruct(x_data)
-    reconstruction_error = _reconstruction_error(x_data, x_rec)
+    reconstruction_error = _reconstruction_error(x_data - rp.mean_,
+                                                 x_rec - rp.mean_)
 
     return rp, reconstruction_error
 
@@ -344,7 +357,7 @@ def _reconstruction_error(x_data: np.ndarray, x_rec: np.ndarray):
 
     if not np.all(abs_data >= abs_rec - 1E-5):
         raise ValueError('Reconstructed vector must be smaller than the '
-                         'original')
+                         f'original. Got {abs_data} < {abs_rec}')
 
     delta = np.linalg.norm(x_data - x_rec, axis=1) / abs_data
     error = np.mean(np.power(delta, 2))
@@ -352,7 +365,8 @@ def _reconstruction_error(x_data: np.ndarray, x_rec: np.ndarray):
 
 
 def reduce_dt(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
-              sync: bool, n_jobs):
+              sync: bool, n_jobs: int,
+              vector_visualization_fn: VectorVisualizationFunction):
 
     logging.info(f'DT - {dataset_name}')
 
@@ -384,8 +398,10 @@ def reduce_dt(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
         fig.write_image(bar_chart_path)
 
         # Save JSON file
-        d = {'n_dims': len(dt_filter.selected_features),
-             'selected_features': dt_filter.selected_features}
+        d = {
+            'n_dims': len(dt_filter.selected_features),
+            'selected_features': dt_filter.selected_features
+        }
 
         with open(json_path, 'w') as fstream:
             json.dump(d, fstream, indent=4)

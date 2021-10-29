@@ -118,8 +118,11 @@ def _best_clustering_index(clustering_scores: List[float]) -> int:
         Best clustering index
 
     """
-    indices = np.arange(len(clustering_scores))
 
+    # Temporarily assign to the absolute best
+    best_index = int(np.argmax(clustering_scores))
+
+    indices = np.arange(len(clustering_scores))
     x = np.array(clustering_scores)
 
     positive_grad = np.concatenate([[False], (x[1:] >= x[:-1])])
@@ -132,10 +135,13 @@ def _best_clustering_index(clustering_scores: List[float]) -> int:
 
         # Find index which maximizes x_local_max, but we convert it to the
         # original index
-        best_index = i_local_max[np.argmax(x_local_max)]
-    else:
-        # There's no local maxima. Just return the maximum.
-        best_index = int(np.argmax(clustering_scores))
+        best_index_ = i_local_max[np.argmax(x_local_max)]
+
+        # This local best index needs to be at lest 75% of the global maximum
+        local_maximum = clustering_scores[best_index_]
+        global_maximum = clustering_scores[best_index]
+        if local_maximum>= 0.75 * global_maximum:
+            best_index = best_index_
 
     return int(best_index)
 

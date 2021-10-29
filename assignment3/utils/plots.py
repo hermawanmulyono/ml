@@ -1,7 +1,8 @@
-from typing import List, Iterable
+from typing import List, Iterable, Callable
 
 import numpy as np
 from plotly import graph_objects as go
+import plotly.express as px
 import matplotlib.pyplot as plt
 from matplotlib import offsetbox
 from sklearn.manifold import TSNE
@@ -30,15 +31,17 @@ def visualize_3d_data(x_data: np.ndarray, y_data: np.ndarray,
                                  scatter_alpha=0.5,
                                  scatter_size=4,
                                  categories=categories)
-    fig.update_layout({'xaxis_title': 'x1',
-                       'yaxis_title': 'x2',
-                       'zaxis_title': 'x3'})
+    fig.update_layout(scene={
+        'xaxis_title': 'x1',
+        'yaxis_title': 'x2',
+        'zaxis_title': 'x3'
+    })
 
     return fig
 
 
 def visualize_reduced_dataset3d(x_data: np.ndarray, y_data: np.ndarray,
-                      categories: List[str]) -> go.Figure:
+                                categories: List[str]) -> go.Figure:
     """Visualizes 3D data
 
     Args:
@@ -261,3 +264,91 @@ def feature_importance_chart(feature_importances: np.ndarray):
     fig.add_trace(go.Bar(x=x, y=sorted_importances))
     return fig
 
+
+def visualize_dataset3d_vectors(vectors: np.ndarray, x_data: np.ndarray,
+                                y_data: np.ndarray):
+
+    _validate_vector_visualization_inputs(vectors, x_data, y_data)
+
+    # Calculate the length of vectors in figure
+    scale = np.max(np.max(x_data, axis=0) - np.min(x_data, axis=0))
+
+    categories = sorted(set(y_data))
+    fig = visualize_3d_data(x_data, y_data, [f'{c}' for c in categories])
+
+    x_mean = x_data.mean(axis=0)
+
+    for vector in vectors:
+        vector = vector / np.linalg.norm(vector) * scale
+        x_arrow = np.array([0, vector[0]]) + x_mean[0]
+        y_arrow = np.array([0, vector[1]]) + x_mean[1]
+        z_arrow = np.array([0, vector[2]]) + x_mean[2]
+        fig.add_trace(
+            go.Scatter3d(x=x_arrow,
+                         y=y_arrow,
+                         z=z_arrow,
+                         mode='lines',
+                         line={'width': 5}))
+
+    return fig
+
+
+def visualize_fashionmnist_vectors(vectors: np.ndarray, x_data: np.ndarray,
+                                   y_data: np.ndarray):
+
+    _validate_vector_visualization_inputs(vectors, x_data, y_data)
+
+    n_dims = x_data.shape[1]
+    thumbnail_length = 28
+    expected_n_dims = thumbnail_length**2
+    if n_dims != expected_n_dims:
+        raise ValueError('Wrong number of features. Expecting '
+                         f'{expected_n_dims}, but got {n_dims}')
+
+    # Rescale all vectors to 0-255
+    min_vectors = np.min(vectors, axis=1)
+    max_vectors = np.max(vectors, axis=1)
+    numerator = vectors - min_vectors.reshape((-1, 1))
+    denominator = max_vectors - min_vectors
+    rescaled_vectors = (numerator / denominator.reshape(
+        (-1, 1)) * 255).astype(np.uint8)
+
+    # Use m x m subplot to include the vectors as thumbnails
+    m = np.ceil(np.sqrt(len(vectors)))
+
+    # Gap between images
+    gap = 10
+
+    canvas_size = int((thumbnail_length + gap) * m + gap)
+    canvas = np.zeros((canvas_size, canvas_size, 3))
+    canvas[:, :] = [255, 255, 0]  # Yellow background
+
+    for i, vector in enumerate(rescaled_vectors):
+        row = int((i // m) * (gap + thumbnail_length) + gap)
+        col = int(i % m * (gap + thumbnail_length) + gap)
+
+        reshaped = np.reshape(vector, (thumbnail_length, thumbnail_length))
+        stacked = np.stack([reshaped]*3, axis=-1)
+
+        canvas[row:row+thumbnail_length, col:col + thumbnail_length] = stacked
+
+    fig = px.imshow(canvas)
+    fig.show()
+    return fig
+
+
+def _validate_vector_visualization_inputs(vectors: np.ndarray,
+                                          x_data: np.ndarray,
+                                          y_data: np.ndarray):
+    if len(x_data) != len(y_data):
+        raise ValueError('x_data and y_data must have the same length.')
+
+    if len(x_data.shape) != 2:
+        raise ValueError('x_data must be a 2-dimensional array')
+
+    if len(vectors.shape) != 2:
+        raise ValueError('vectors must be a 2-dimensional array')
+
+    if vectors.shape[1] != x_data.shape[1]:
+        raise ValueError('vectors and x_data must have the same number of '
+                         'features')
