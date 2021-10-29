@@ -333,6 +333,9 @@ def visualize_fashionmnist_vectors(vectors: np.ndarray, x_data: np.ndarray,
         canvas[row:row+thumbnail_length, col:col + thumbnail_length] = stacked
 
     fig = px.imshow(canvas)
+    fig.update_layout(xaxis_visible=False, xaxis_showticklabels=False,
+                      yaxis_visible=False, yaxis_showticklabels=False)
+
     fig.show()
     return fig
 

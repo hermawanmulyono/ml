@@ -99,10 +99,8 @@ def reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
             for n_dims in n_dims_list:
                 yield x_data, n_dims
 
-        # with Pool(n_jobs) as pool:
-        #     tuples = pool.starmap(_fit_pca, args_generator())
-
-        tuples = [_fit_pca(*args) for args in args_generator()]
+        with Pool(n_jobs) as pool:
+            tuples = pool.starmap(_fit_pca, args_generator())
 
         pcas, errors = zip(*tuples)
 
@@ -112,7 +110,7 @@ def reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
         chosen_index = 1
         joblib.dump(pca, joblib_path)
 
-        # Store the vector visualization
+        # Store the projection vector visualization
         fig = vector_visualization_fn(pca.components_, x_data, y_data)
         fig.write_image(vector_viz_path)
 
@@ -280,9 +278,12 @@ def reduce_rp(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
     joblib_path = reduction_alg_joblib(dataset_name, alg_name)
     rec_error_path = reconstruction_error_png(dataset_name, alg_name)
     json_path = reduction_json(dataset_name, alg_name)
+    vector_viz_path = vector_visualization_png(dataset_name, alg_name)
 
-    files_exist = os.path.exists(joblib_path) and os.path.exists(
-        rec_error_path) and os.path.exists(json_path)
+    files_exist = all([
+        os.path.exists(p)
+        for p in [joblib_path, rec_error_path, json_path, vector_viz_path]
+    ])
 
     if (not sync) and (not files_exist):
         raise FileNotFoundError(
@@ -303,10 +304,19 @@ def reduce_rp(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
 
         rps, errors = zip(*tuples)
 
-        # Store RP joblib. Just pick the 2nd dimension.
-        assert len(rps) >= 2
-        chosen_index = 1
-        joblib.dump(rps[chosen_index], joblib_path)
+        # Pick RP such that its reconstruction error is <= 0.5
+        error_threshold = 0.1
+        errors_np = np.array(errors)
+        good_indices = np.arange(len(errors))[errors_np <= error_threshold]
+        best_index = int(np.min(good_indices))
+        best_rp: GaussianRP = rps[best_index]
+
+        # Store the bet GaussianRP
+        joblib.dump(best_rp, joblib_path)
+
+        # Store the projection vector visualization
+        fig = vector_visualization_fn(best_rp.components_, x_data, y_data)
+        fig.write_image(vector_viz_path)
 
         # Save reconstruction error plot
         fig = simple_line_plot(n_dims_list, errors, 'n_components',
@@ -314,7 +324,7 @@ def reduce_rp(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
         fig.write_image(rec_error_path)
 
         # Save raw data as JSON
-        d = {'reconstruction_error': errors[chosen_index]}
+        d = {'reconstruction_error': errors[best_index]}
 
         with open(json_path, 'w') as fstream:
             json.dump(d, fstream, indent=4)
@@ -360,7 +370,7 @@ def _reconstruction_error(x_data: np.ndarray, x_rec: np.ndarray):
                          f'original. Got {abs_data} < {abs_rec}')
 
     delta = np.linalg.norm(x_data - x_rec, axis=1) / abs_data
-    error = np.mean(np.power(delta, 2))
+    error = np.mean(delta)
     return error
 
 
