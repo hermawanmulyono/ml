@@ -22,6 +22,11 @@ def clustering_visualization_png(dataset_name: str, alg_name: str):
            f'{alg_name}_clustering_visualization.png'
 
 
+def clustering_evaluation_json(dataset_name: str, alg_name: str):
+    return f'{OUTPUT_DIRECTORY}/{dataset_name}_' \
+           f'{alg_name}_clustering_evaluation.json'
+
+
 def reduction_alg_joblib(dataset_name: str, alg_name: str):
     return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}_reduction_alg.joblib'
 

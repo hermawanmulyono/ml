@@ -1,3 +1,4 @@
+import json
 import os
 from multiprocessing import Pool
 from typing import Union, Callable, List, Type
@@ -6,11 +7,11 @@ import joblib
 import numpy as np
 from plotly import graph_objects as go
 from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score
+from sklearn.metrics import silhouette_score, rand_score
 from sklearn.mixture import GaussianMixture
 
 from utils.outputs import clusterer_joblib, clustering_score_png, \
-    clustering_visualization_png
+    clustering_visualization_png, clustering_evaluation_json
 from utils.plots import simple_line_plot
 
 ClusteringAlg = Union[KMeans, GaussianMixture]
@@ -26,8 +27,7 @@ ClusteringVisualizationFunc = Callable[[np.ndarray, np.ndarray, List[str]],
 VisualizationFunction = Callable[[np.ndarray, np.ndarray, List[str]], go.Figure]
 
 
-def run_clustering(dataset_name: str,
-                   x_data: np.ndarray,
+def run_clustering(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
                    visualization_fn: ClusteringVisualizationFunc,
                    n_jobs: int = 1):
     clustering_algs = [KMeans, GaussianMixture]
@@ -36,6 +36,7 @@ def run_clustering(dataset_name: str,
         clusterer = _sync_clusterer(alg, dataset_name, x_data, n_jobs)
         _sync_clustering_visualization(dataset_name, x_data, clusterer,
                                        visualization_fn)
+        _sync_cluster_evaluation(dataset_name, x_data, y_data, clusterer)
 
 
 def _sync_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray,
@@ -165,6 +166,7 @@ def _sync_clustering_visualization(dataset_name: str, x_train: np.ndarray,
             type hint definition for more information.
 
     Returns:
+        None. This function writes data to the file system.
 
     """
     alg_name = clusterer.__class__.__name__
@@ -176,3 +178,20 @@ def _sync_clustering_visualization(dataset_name: str, x_train: np.ndarray,
         categories = [f'cluster_{c}' for c in all_labels]
         fig = visualization_fn(x_train, pred_labels, categories)
         fig.write_image(png_path)
+
+
+def _sync_cluster_evaluation(dataset_name: str, x_data: np.ndarray,
+                             y_data: np.ndarray,
+                             clusterer: ClusteringAlg):
+
+    alg_name = clusterer.__class__.__name__
+    json_path = clustering_evaluation_json(dataset_name, alg_name)
+
+    if not os.path.exists(json_path):
+        y_pred = clusterer.predict(x_data)
+        random_index = rand_score(y_data, y_pred)
+
+        d = {'random_index': random_index}
+
+        with open(json_path, 'w') as fs:
+            json.dump(d, fs)

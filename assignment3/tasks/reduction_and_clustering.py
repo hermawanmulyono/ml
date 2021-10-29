@@ -28,5 +28,5 @@ def run_reduction_and_clustering(dataset_name: str,
         x_reduced, reduction_alg = dims_reduction_step(dataset_name, x_data,
                                                        y_data, sync, n_jobs)
         prefix = reduction_alg.__class__.__name__
-        run_clustering(f'{prefix}-{dataset_name}', x_reduced, visualization_fn,
-                       n_jobs)
+        run_clustering(f'{prefix}-{dataset_name}', x_reduced, y_data,
+                       visualization_fn, n_jobs)

@@ -41,7 +41,7 @@ class DTFilter:
         if not self._selected_features:
             raise RuntimeError('fit() must be called before transform()')
 
-        return X[self._selected_features]
+        return X[:, self._selected_features]
 
     @property
     def dt(self):
