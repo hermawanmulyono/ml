@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from multiprocessing import Pool
-from typing import Callable
+from typing import Callable, Union, Optional
 
 import joblib
 import numpy as np
@@ -22,6 +22,9 @@ from utils.plots import simple_line_plot, feature_importance_chart
 VectorVisualizationFunction = Callable[[np.ndarray, np.ndarray, np.ndarray],
                                        go.Figure]
 
+# Reduction Algorithm
+ReductionAlgorithm = Union[PCA, FastICA, GaussianRP, DTFilter]
+
 
 def run_dim_reduction(dataset_name: str,
                       x_data: np.ndarray,
@@ -40,9 +43,13 @@ def run_dim_reduction(dataset_name: str,
               vector_visualization_fn)
 
 
-def reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
-               sync: bool, n_jobs,
-               vector_visualization_fn: VectorVisualizationFunction):
+def reduce_pca(
+        dataset_name: str,
+        x_data: np.ndarray,
+        y_data: np.ndarray,
+        sync: bool,
+        n_jobs,
+        vector_visualization_fn: Optional[VectorVisualizationFunction]):
     """Reduces the `x_data` to `n_dims` dimensions.
 
     This function uses the PCA algorithm.
@@ -60,7 +67,7 @@ def reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
         n_jobs: Number of Python processes to use in
             parallel.
         vector_visualization_fn: Vector visualization 
-            function.
+            function. Only required when `sync = True`.
 
     Returns:
         `(x_reduced, pca)` tuple. `x_reduced` is the
@@ -166,9 +173,13 @@ def _reconstruct_pca(pca: PCA, X: np.ndarray):
     return x_rec
 
 
-def reduce_ica(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
-               sync: bool, n_jobs: int,
-               vector_visualization_fn: VectorVisualizationFunction):
+def reduce_ica(
+        dataset_name: str,
+        x_data: np.ndarray,
+        y_data: np.ndarray,
+        sync: bool,
+        n_jobs: int,
+        vector_visualization_fn: Optional[VectorVisualizationFunction]):
     logging.info(f'ICA - {dataset_name}')
 
     check_input(x_data)
@@ -266,9 +277,13 @@ def _fit_ica(x_data: np.ndarray, n_dims: int):
     return ica, mean_abs_kurtosis
 
 
-def reduce_rp(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
-              sync: bool, n_jobs: int,
-              vector_visualization_fn: VectorVisualizationFunction):
+def reduce_rp(
+        dataset_name: str,
+        x_data: np.ndarray,
+        y_data: np.ndarray,
+        sync: bool,
+        n_jobs: int,
+        vector_visualization_fn: VectorVisualizationFunction = do_nothing_fn):
     logging.info(f'Random Projection - {dataset_name}')
 
     check_input(x_data)
@@ -376,9 +391,13 @@ def _reconstruction_error(x_data: np.ndarray, x_rec: np.ndarray):
     return error
 
 
-def reduce_dt(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
-              sync: bool, n_jobs: int,
-              vector_visualization_fn: VectorVisualizationFunction):
+def reduce_dt(
+        dataset_name: str,
+        x_data: np.ndarray,
+        y_data: np.ndarray,
+        sync: bool,
+        n_jobs: int,
+        vector_visualization_fn: Optional[VectorVisualizationFunction]):
 
     logging.info(f'DT - {dataset_name}')
 
