@@ -283,7 +283,7 @@ def reduce_rp(
         y_data: np.ndarray,
         sync: bool,
         n_jobs: int,
-        vector_visualization_fn: VectorVisualizationFunction = do_nothing_fn):
+        vector_visualization_fn: Optional[VectorVisualizationFunction]):
     logging.info(f'Random Projection - {dataset_name}')
 
     check_input(x_data)

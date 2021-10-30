@@ -27,8 +27,9 @@ class ReductionAndNN:
             weight_decay=1e-6,
             verbose=False):
 
-        x_reduced = self.reduction_alg.transform(x_train)
-        in_features = x_reduced.shape[1]
+        x_train_red = self.reduction_alg.transform(x_train)
+        x_val_red = self.reduction_alg.transform(x_val)
+        in_features = x_train_red.shape[1]
 
         # Infer n_classes from y_train and y_val
         max1 = np.max(y_train)
@@ -37,7 +38,7 @@ class ReductionAndNN:
         num_classes = np.max([max1, max2]) + 1
 
         nn = NeuralNetworkEstimator(in_features, num_classes, HIDDEN_LAYERS)
-        nn.fit(x_train, y_train, x_val, y_val, learning_rate, batch_size,
+        nn.fit(x_train_red, y_train, x_val_red, y_val, learning_rate, batch_size,
                epochs, weight_decay, verbose)
         self.nn = nn
 
@@ -76,11 +77,13 @@ def run_reduction_and_nn(dataset_name: str,
 
     for dims_reduction_step in dims_reduction_steps:
         x_reduced, reduction_alg = dims_reduction_step(dataset_name, x_train,
-                                                       y_train, sync, n_jobs)
+                                                       y_train, sync, n_jobs,
+                                                       None)
 
         red_nn = ReductionAndNN(reduction_alg)
         red_nn.fit(x_train, y_train, x_val, y_val, learning_rate=1e-5,
-                   epochs=100, batch_size=min(len(x_train), 1024))
+                   epochs=2000, batch_size=min(len(x_train), 1024),
+                   verbose=True)
 
         train_acc = accuracy_score(y_train, red_nn.predict(x_train))
         val_acc = accuracy_score(y_val, red_nn.predict(x_val))
