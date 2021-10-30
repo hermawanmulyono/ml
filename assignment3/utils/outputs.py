@@ -9,6 +9,11 @@ OUTPUT_DIRECTORY = 'outputs'
 os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
 
 
+############################################################
+# Clustering
+############################################################
+
+
 def clusterer_joblib(dataset_name: str, alg_name: str):
     return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}_clusterer.joblib'
 
@@ -25,6 +30,11 @@ def clustering_visualization_png(dataset_name: str, alg_name: str):
 def clustering_evaluation_json(dataset_name: str, alg_name: str):
     return f'{OUTPUT_DIRECTORY}/{dataset_name}_' \
            f'{alg_name}_clustering_evaluation.json'
+
+
+############################################################
+# Dimensionality reduction
+############################################################
 
 
 def reduction_alg_joblib(dataset_name: str, alg_name: str):
@@ -52,3 +62,17 @@ def kurtosis_png(dataset_name: str, alg_name: str):
 def feature_importances_png(dataset_name: str, alg_name: str):
     return f'{OUTPUT_DIRECTORY}/{dataset_name}_' \
            f'{alg_name}_feature_importances.png'
+
+
+############################################################
+# Reduction ant NN
+############################################################
+
+
+def reduction_and_nn_joblib(dataset_name: str, alg_name: str):
+    return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}.joblib'
+
+
+def training_curve(dataset_name: str, alg_name: str):
+    return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}_training_curve.png'
+
