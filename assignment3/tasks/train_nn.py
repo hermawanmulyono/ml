@@ -5,18 +5,26 @@ import joblib
 import numpy as np
 from sklearn.metrics import accuracy_score
 
+from tasks.clustering import ClusteringAlg
 from tasks.dims_reduction import reduce_pca, reduce_ica, reduce_rp, reduce_dt, \
     VectorVisualizationFunction, ReductionAlgorithm
-from utils.nnestimator import NeuralNetworkEstimator, training_curves
+from utils.nnestimator import NeuralNetworkEstimator, training_curves, one_hot
 from utils.outputs import reduction_and_nn_joblib, training_curve
 
 HIDDEN_LAYERS = [16] * 4
 
 
-class ReductionAndNN:
+class ReductionClusteringNN:
 
-    def __init__(self, reduction_alg: ReductionAlgorithm):
+    def __init__(self,
+                 reduction_alg: ReductionAlgorithm = None,
+                 clustering_alg: ClusteringAlg = None):
+
         self.reduction_alg = reduction_alg
+        self.clustering_alg = clustering_alg
+
+        # These will be initialized in `fit()`
+        self.n_classes: Optional[int] = None
         self.nn: Optional[NeuralNetworkEstimator] = None
 
     def fit(self,
@@ -30,8 +38,8 @@ class ReductionAndNN:
             weight_decay=1e-6,
             verbose=False):
 
-        x_train_red = self.reduction_alg.transform(x_train)
-        x_val_red = self.reduction_alg.transform(x_val)
+        x_train_red = self._reduce_dims(x_train)
+        x_val_red = self._reduce_dims(x_val)
         in_features = x_train_red.shape[1]
 
         # Infer n_classes from y_train and y_val
@@ -43,12 +51,52 @@ class ReductionAndNN:
         nn = NeuralNetworkEstimator(in_features, num_classes, HIDDEN_LAYERS)
         nn.fit(x_train_red, y_train, x_val_red, y_val, learning_rate,
                batch_size, epochs, weight_decay, verbose)
+
         self.nn = nn
+        self.n_classes = num_classes
 
     def predict(self, X: np.ndarray):
-        x_reduced = self.reduction_alg.transform(X)
+        x_reduced = self._reduce_dims(X)
         predicted = self.nn.predict(x_reduced)
         return predicted
+
+    def transform(self, X: np.ndarray):
+        """Transforms feature matrix
+
+        There are two steps:
+          - Dimensionality reduction
+          - Clustering features are added
+
+        Depending on the arguments given during
+        construction, either of these steps can be omitted.
+
+        Args:
+            X: Feature matrix of shape `(N, n_features)`
+
+        Returns:
+            The transformed feature matrix of shape
+                `(N, n_appended_features)`
+
+        """
+        x_reduced = self._reduce_dims(X)
+        x_concat = self._add_clustering_features(x_reduced)
+        return x_concat
+
+    def _reduce_dims(self, X: np.ndarray):
+        if self.reduction_alg is not None:
+            return self.reduction_alg.transform(X)
+
+        return X.copy()
+
+    def _add_clustering_features(self, X: np.ndarray):
+        if self.clustering_alg is None:
+            return X.copy()
+
+        clust_labels = self.clustering_alg.predict(X)
+        oh_features = one_hot(clust_labels, self.n_classes)
+
+        x_concat = np.concatenate([X, oh_features], axis=1)
+        return x_concat
 
 
 def run_reduction_and_nn(dataset_name: str,
@@ -120,7 +168,7 @@ def _sync_reduction_and_nn(dataset_name: str, x_train: np.ndarray,
         training_curve_path)
 
     if not files_exist:
-        red_nn = ReductionAndNN(reduction_alg)
+        red_nn = ReductionClusteringNN(reduction_alg)
         red_nn.fit(x_train,
                    y_train,
                    x_val,
@@ -140,3 +188,23 @@ def _sync_reduction_and_nn(dataset_name: str, x_train: np.ndarray,
     print(f'{reduce_pca.__name__} train_acc {train_acc}, val_acc {val_acc}')
 
     return red_nn
+
+
+def reduction_clustering_nn(dataset_name: str,
+                            x_train: np.ndarray,
+                            y_train: np.ndarray,
+                            x_val: np.ndarray,
+                            y_val: np.ndarray,
+                            n_jobs=1):
+    # Assume all dimensionality reduction algorithms have been run
+    sync = False
+
+    dims_reduction_steps = [reduce_pca, reduce_ica, reduce_rp, reduce_dt]
+
+    for dims_reduction_step in dims_reduction_steps:
+        x_reduced, reduction_alg = dims_reduction_step(dataset_name, x_train,
+                                                       y_train, sync, n_jobs,
+                                                       None)
+        _sync_reduction_and_nn(dataset_name, x_train, y_train, x_val, y_val,
+                               reduction_alg)
+        raise NotImplementedError
