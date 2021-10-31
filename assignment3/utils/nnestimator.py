@@ -478,44 +478,67 @@ def training_curves(training_log: Dict[str, list]):
     return loss_fig, acc_fig
 
 
-def train_nn_multiple(x_train, y_train, x_val, y_val, in_features, num_classes,
-                      nn_size, learning_rate, batch_size, epochs, verbose,
-                      attempts=3):
+def train_nn(
+    x_train: np.ndarray,
+    y_train: np.ndarray,
+    x_val: np.ndarray,
+    y_val: np.ndarray,
+    in_features: int,
+    num_classes: int,
+    nn_size: int,
+    learning_rate: float,
+    batch_size: int,
+    epochs: int,
+    verbose: bool,
+):
+    """Trains a NeuralNetworkEstimator
 
-    nn_ = None
-    fit_time = None
+    This function unpacks the arguments for the constructor
+    and the `fit()` function.
+
+    Args:
+        x_train: Training features
+        y_train: Training labels
+        x_val: Validation features
+        y_val: Validation labels
+        in_features: Dimension of the input features
+        num_classes: Number of classes
+        nn_size: Neural network sizes. The hidden layers
+            will be initialized such that the width
+            is `nn_size * 4` and the depth is `nn_size`.
+        learning_rate: Training learning rate
+        batch_size: Training batch size
+        epochs: Training epoch
+        verbose: If `True` will print information to the
+            console while training.
+
+    Returns:
+        The trained neural network.
+    """
 
     hidden_layers = [nn_size * 4] * nn_size
 
-    for attempt in range(attempts):
+    nn_ = NeuralNetworkEstimator(in_features=in_features,
+                                 num_classes=num_classes,
+                                 hidden_layers=hidden_layers)
+    start = time.time()
+    nn_.fit(x_train,
+            y_train,
+            x_val,
+            y_val,
+            learning_rate=learning_rate,
+            batch_size=batch_size,
+            epochs=epochs,
+            verbose=verbose)
+    end = time.time()
+    fit_time = end - start
 
-        nn_ = NeuralNetworkEstimator(in_features=in_features,
-                                     num_classes=num_classes,
-                                     hidden_layers=hidden_layers)
-        start = time.time()
-        nn_.fit(x_train,
-                y_train,
-                x_val,
-                y_val,
-                learning_rate=learning_rate,
-                batch_size=batch_size,
-                epochs=epochs,
-                verbose=verbose)
-        end = time.time()
-        fit_time = end - start
-
-        if len(nn_.training_log['epoch']) == epochs:
-            best_index = np.argmax(nn_.training_log["val_accuracy"])
-            best_val_acc = nn_.training_log["val_accuracy"][best_index]
-            train_acc = nn_.training_log["train_accuracy"][best_index]
-            logging.info('Successfully trained a neural network with '
-                         f'validation accuracy of {best_val_acc},'
-                         f' training accuracy of {train_acc}')
-            break
-        elif attempt < attempts:
-            logging.info('Neural network training failed. Trying again')
-        else:
-            logging.info('Exceeded maximum attempt in training neural '
-                         'network.')
+    if len(nn_.training_log['epoch']) == epochs:
+        best_index = np.argmax(nn_.training_log["val_accuracy"])
+        best_val_acc = nn_.training_log["val_accuracy"][best_index]
+        train_acc = nn_.training_log["train_accuracy"][best_index]
+        logging.info('Successfully trained a neural network with '
+                     f'validation accuracy of {best_val_acc},'
+                     f' training accuracy of {train_acc}')
 
     return nn_, fit_time

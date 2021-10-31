@@ -2,7 +2,7 @@ import argparse
 import logging
 
 from tasks.reduction_and_clustering import run_reduction_and_clustering
-from tasks.train_nn import run_reduction_and_nn
+from tasks.train_nn import run_reduction_and_nn, run_reduction_clustering_nn
 from utils.data import gen_3d_data, get_fashion_mnist_data
 from utils.plots import visualize_3d_data, visualize_fashion_mnist, \
     visualize_reduced_dataset3d, visualize_dataset3d_vectors, \
@@ -57,7 +57,9 @@ def dataset2(n_jobs: int):
                       visualize_fashionmnist_vectors,
                       sync=True,
                       n_jobs=n_jobs)
-    run_reduction_and_nn(dataset_name, x_train, y_train, x_val, y_val)
+    run_reduction_and_nn(dataset_name, x_train, y_train, x_val, y_val, n_jobs)
+    run_reduction_clustering_nn(dataset_name, x_train, y_train, x_val, y_val,
+                                n_jobs)
 
 
 def main():

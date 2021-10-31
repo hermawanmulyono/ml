@@ -3,11 +3,10 @@ This module contains the paths to output files
 """
 
 import os
-
+from typing import Optional
 
 OUTPUT_DIRECTORY = 'outputs'
 os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
-
 
 ############################################################
 # Clustering
@@ -65,14 +64,23 @@ def feature_importances_png(dataset_name: str, alg_name: str):
 
 
 ############################################################
-# Reduction ant NN
+# Reduction -> Clustering -> NN
 ############################################################
 
 
-def reduction_and_nn_joblib(dataset_name: str, alg_name: str):
-    return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}.joblib'
+def reduction_and_nn_joblib(dataset_name: str,
+                            reduction_alg_name: Optional[str],
+                            clustering_alg_name: Optional[str]):
+    return f'{OUTPUT_DIRECTORY}/{dataset_name}_{reduction_alg_name}_{clustering_alg_name}.joblib'
 
 
-def training_curve(dataset_name: str, alg_name: str):
-    return f'{OUTPUT_DIRECTORY}/{dataset_name}_{alg_name}_training_curve.png'
+def training_curve(dataset_name: str, reduction_alg_name: Optional[str],
+                   clustering_alg_name: Optional[str]):
+    return f'{OUTPUT_DIRECTORY}/{dataset_name}_' \
+           f'{reduction_alg_name}_{clustering_alg_name}_training_curve.png'
 
+
+def grid_search_json(dataset_name: str, reduction_alg_name: Optional[str],
+                     clustering_alg_name: Optional[str]):
+    return f'{OUTPUT_DIRECTORY}/{dataset_name}_{reduction_alg_name}_' \
+           f'{clustering_alg_name}_grid_search.json'

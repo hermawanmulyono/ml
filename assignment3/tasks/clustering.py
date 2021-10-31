@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from multiprocessing import Pool
 from typing import Union, Callable, List, Type
@@ -30,6 +31,7 @@ VisualizationFunction = Callable[[np.ndarray, np.ndarray, List[str]], go.Figure]
 def run_clustering(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
                    visualization_fn: ClusteringVisualizationFunc,
                    n_jobs: int = 1):
+    logging.info(f'run_clustering() - {dataset_name}')
     clustering_algs = [KMeans, GaussianMixture]
 
     for alg in clustering_algs:

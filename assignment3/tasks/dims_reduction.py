@@ -32,7 +32,7 @@ def run_dim_reduction(dataset_name: str,
                       vector_visualization_fn: VectorVisualizationFunction,
                       sync=False,
                       n_jobs=1):
-
+    logging.info(f'run_dim_reduction() - {dataset_name}')
     reduce_pca(dataset_name, x_data, y_data, sync, n_jobs,
                vector_visualization_fn)
     reduce_ica(dataset_name, x_data, y_data, sync, n_jobs,
