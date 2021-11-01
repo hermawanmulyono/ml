@@ -28,22 +28,26 @@ ClusteringVisualizationFunc = Callable[[np.ndarray, np.ndarray, List[str]],
 VisualizationFunction = Callable[[np.ndarray, np.ndarray, List[str]], go.Figure]
 
 
-def run_clustering(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
+def run_clustering(dataset_name: str,
+                   x_data: np.ndarray,
+                   y_data: np.ndarray,
                    visualization_fn: ClusteringVisualizationFunc,
                    n_jobs: int = 1):
-    logging.info(f'run_clustering() - {dataset_name}')
     clustering_algs = [KMeans, GaussianMixture]
 
+    # TODO: Gaussian Mixture other than "full"
+
     for alg in clustering_algs:
-        clusterer = _sync_clusterer(alg, dataset_name, x_data, n_jobs)
+        logging.info(f'run_clustering() - {dataset_name} - {alg.__name__}')
+        clusterer = _get_clusterer(alg, dataset_name, x_data, n_jobs, sync=True)
         _sync_clustering_visualization(dataset_name, x_data, clusterer,
                                        visualization_fn)
         _sync_cluster_evaluation(dataset_name, x_data, y_data, clusterer)
 
 
-def _sync_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray,
-                    n_jobs: int):
-    """Synchronizes clusterer
+def _get_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray,
+                   n_jobs: int, sync: bool):
+    """Gets clusterer
 
     To synchronize means to create when a file does not
     exist yet.
@@ -61,6 +65,9 @@ def _sync_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray,
         dataset_name: Dataset name
         x_train: Training data
         n_jobs: Number of Python processes to use
+        sync: If `True`, synchronize the clusterer. If
+            `False` will assume that clusterer already
+            exists.
 
     Returns:
         A clusterer instance. This is the clusterer that
@@ -71,10 +78,14 @@ def _sync_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray,
     clusterer_joblib_path = clusterer_joblib(dataset_name, alg_name)
     clustering_score_plot_path = clustering_score_png(dataset_name, alg_name)
 
-    joblib_exists = os.path.exists(clusterer_joblib_path)
-    png_exists = os.path.exists(clustering_score_plot_path)
+    files_exist = os.path.exists(clusterer_joblib_path) and os.path.exists(
+        clustering_score_plot_path)
 
-    if joblib_exists and png_exists:
+    if (not sync) and (not files_exist):
+        raise FileNotFoundError(
+            f'{clusterer_joblib_path} or {clustering_score_plot_path} does not exist')
+
+    if files_exist:
         best_clusterer = joblib.load(clusterer_joblib_path)
 
     else:
@@ -95,13 +106,11 @@ def _sync_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray,
         best_index = _best_clustering_index(clustering_scores)
         best_clusterer = clusterers[best_index]
 
-        if not joblib_exists:
-            joblib.dump(best_clusterer, clusterer_joblib_path)
+        joblib.dump(best_clusterer, clusterer_joblib_path)
 
-        if not png_exists:
-            fig = simple_line_plot(n_clusters, clustering_scores, 'n_clusters',
-                                   'silhouette')
-            fig.write_image(clustering_score_plot_path)
+        fig = simple_line_plot(n_clusters, clustering_scores, 'n_clusters',
+                               'silhouette')
+        fig.write_image(clustering_score_plot_path)
 
     return best_clusterer
 
@@ -142,7 +151,7 @@ def _best_clustering_index(clustering_scores: List[float]) -> int:
         # This local best index needs to be at lest 75% of the global maximum
         local_maximum = clustering_scores[best_index_]
         global_maximum = clustering_scores[best_index]
-        if local_maximum>= 0.75 * global_maximum:
+        if local_maximum >= 0.75 * global_maximum:
             best_index = best_index_
 
     return int(best_index)
@@ -189,8 +198,7 @@ def _sync_clustering_visualization(dataset_name: str, x_train: np.ndarray,
 
 
 def _sync_cluster_evaluation(dataset_name: str, x_data: np.ndarray,
-                             y_data: np.ndarray,
-                             clusterer: ClusteringAlg):
+                             y_data: np.ndarray, clusterer: ClusteringAlg):
 
     alg_name = clusterer.__class__.__name__
     json_path = clustering_evaluation_json(dataset_name, alg_name)

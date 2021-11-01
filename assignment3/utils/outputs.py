@@ -68,10 +68,11 @@ def feature_importances_png(dataset_name: str, alg_name: str):
 ############################################################
 
 
-def reduction_and_nn_joblib(dataset_name: str,
-                            reduction_alg_name: Optional[str],
-                            clustering_alg_name: Optional[str]):
-    return f'{OUTPUT_DIRECTORY}/{dataset_name}_{reduction_alg_name}_{clustering_alg_name}.joblib'
+def reduction_clustering_nn_joblib(dataset_name: str,
+                                   reduction_alg_name: Optional[str],
+                                   clustering_alg_name: Optional[str]):
+    return f'{OUTPUT_DIRECTORY}/{dataset_name}_{reduction_alg_name}_' \
+           f'{clustering_alg_name}_reduction_clustering_nn.joblib'
 
 
 def training_curve(dataset_name: str, reduction_alg_name: Optional[str],

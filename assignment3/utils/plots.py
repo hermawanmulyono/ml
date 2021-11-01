@@ -9,8 +9,10 @@ from sklearn.manifold import TSNE
 from sklearn.preprocessing import MinMaxScaler
 
 
-def visualize_3d_data(x_data: np.ndarray, y_data: np.ndarray,
-                      categories: List[str], scatter_alpha: float = 0.5) ->go.Figure:
+def visualize_3d_data(x_data: np.ndarray,
+                      y_data: np.ndarray,
+                      categories: List[str],
+                      scatter_alpha: float = 0.5) -> go.Figure:
     """Visualizes 3D data
 
     Args:
@@ -74,13 +76,13 @@ def visualize_reduced_dataset3d(x_data: np.ndarray, y_data: np.ndarray,
                                  scatter_size=4,
                                  categories=categories)
 
-    updated_layout = {'xaxis_title': 'x1'}
-    if n_dims >= 2:
-        updated_layout['yaxis_title'] = 'x2'
-    if n_dims == 3:
-        updated_layout['zaxis_title'] = 'x3'
-
-    fig.update_layout(updated_layout)
+    # updated_layout = {'xaxis_title': 'x1'}
+    # if n_dims >= 2:
+    #     updated_layout['yaxis_title'] = 'x2'
+    # if n_dims == 3:
+    #     updated_layout['zaxis_title'] = 'x3'
+    #
+    # fig.update_layout(updated_layout)
 
     return fig
 
@@ -246,6 +248,72 @@ def visualize_fashion_mnist(x_data: np.ndarray, y_data: np.ndarray,
     return adapter_figure
 
 
+def get_visualize_reduced_fashion_mnist_fn(x_original: np.ndarray):
+
+    if x_original.shape[1] != 784:
+        raise ValueError('x_data of Fashion-MNIST must be 784-dimensional')
+
+    len_data = len(x_original)
+
+    def visualize_reduced_fashion_mnist(x_data: np.ndarray, y_data: np.ndarray,
+                                        categories: List[str]):
+
+        if len(x_data) != len_data:
+            raise ValueError(f'Expecting data of length {len_data}, but got'
+                             f'{len(x_data)}')
+
+        tsne = TSNE()
+        transformed = tsne.fit_transform(x_data)
+        assert len(transformed.shape) == 2
+
+        fig, ax = plt.subplots()
+        fig.set_size_inches(10, 10)
+        transformed = MinMaxScaler().fit_transform(transformed)
+
+        possible_labels = sorted(set(y_data))
+        if not ((0 <= min(possible_labels)) and
+                (max(possible_labels) < len(categories))):
+            raise ValueError(
+                f'Possible labels are not consistent with the labels {categories}'
+            )
+
+        original_indices = np.arange(len(x_data))
+
+        shown_images = np.array([[1.0, 1.0]])  # initially, just something big
+
+        for label in possible_labels:
+            category_name = categories[label]
+
+            selected_indices = original_indices[y_data == label]
+            x_selected = transformed[selected_indices]
+
+            plt.scatter(x_selected[:, 0], x_selected[:, 1], label=category_name)
+
+            for i in selected_indices:
+                # show an annotation box for a group of digits
+                dist = np.sum((transformed[i] - shown_images)**2, 1)
+                if np.min(dist) < 6e-3:
+                    # don't show points that are too close
+                    continue
+                shown_images = np.concatenate([shown_images, [transformed[i]]],
+                                              axis=0)
+
+                x_disp = x_original[i]
+                thumbnail = np.reshape(x_disp, (28, 28))
+
+                imagebox = offsetbox.AnnotationBbox(
+                    offsetbox.OffsetImage(thumbnail, cmap=plt.cm.gray_r),
+                    transformed[i])
+                ax.add_artist(imagebox)
+
+        ax.legend()
+        adapter_figure = MatplotlibAdapter(fig, ax)
+
+        return adapter_figure
+
+    return visualize_reduced_fashion_mnist
+
+
 def feature_importance_chart(feature_importances: np.ndarray):
     """Feature importance bar chart
 
@@ -277,7 +345,8 @@ def visualize_dataset3d_vectors(vectors: np.ndarray, x_data: np.ndarray,
     scale = np.max(np.max(x_data, axis=0) - np.min(x_data, axis=0))
 
     categories = sorted(set(y_data))
-    fig = visualize_3d_data(x_data, y_data, [f'{c}' for c in categories],
+    fig = visualize_3d_data(x_data,
+                            y_data, [f'{c}' for c in categories],
                             scatter_alpha=0.9)
 
     x_mean = x_data.mean(axis=0)
@@ -332,15 +401,17 @@ def visualize_fashionmnist_vectors(vectors: np.ndarray, x_data: np.ndarray,
         col = int(i % m * (gap + thumbnail_length) + gap)
 
         reshaped = np.reshape(vector, (thumbnail_length, thumbnail_length))
-        stacked = np.stack([reshaped]*3, axis=-1)
+        stacked = np.stack([reshaped] * 3, axis=-1)
 
-        canvas[row:row+thumbnail_length, col:col + thumbnail_length] = stacked
+        canvas[row:row + thumbnail_length, col:col + thumbnail_length] = stacked
 
     fig = px.imshow(canvas)
-    fig.update_layout(xaxis_visible=False, xaxis_showticklabels=False,
-                      yaxis_visible=False, yaxis_showticklabels=False)
+    fig.update_layout(xaxis_visible=False,
+                      xaxis_showticklabels=False,
+                      yaxis_visible=False,
+                      yaxis_showticklabels=False)
 
-    fig.show()
+    # fig.show()
     return fig
 
 

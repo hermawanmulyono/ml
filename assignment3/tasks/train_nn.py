@@ -9,12 +9,12 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import accuracy_score
 from sklearn.mixture import GaussianMixture
 
-from tasks.clustering import ClusteringAlg, _sync_clusterer
+from tasks.clustering import ClusteringAlg, _get_clusterer
 from tasks.dims_reduction import reduce_pca, reduce_ica, reduce_rp, reduce_dt, \
     VectorVisualizationFunction, ReductionAlgorithm
 from utils.grid_search import grid_search_nn
 from utils.nnestimator import NeuralNetworkEstimator, training_curves, one_hot
-from utils.outputs import reduction_and_nn_joblib, training_curve, \
+from utils.outputs import reduction_clustering_nn_joblib, training_curve, \
     grid_search_json
 
 HIDDEN_LAYERS = [16] * 4
@@ -53,15 +53,16 @@ class ReductionClusteringNN:
             x_val: np.ndarray = None,
             y_val: np.ndarray = None):
 
-        x_train_red = self.transform(x_train)
-        x_val_red = self.transform(x_val)
-        in_features = x_train_red.shape[1]
-
         # Infer n_classes from y_train and y_val
         max1 = np.max(y_train)
         max2 = np.max(y_val)
 
-        num_classes = np.max([max1, max2]) + 1
+        num_classes = int(np.max([max1, max2]) + 1)
+        self.n_classes = num_classes
+
+        x_train_red = self.transform(x_train)
+        x_val_red = self.transform(x_val)
+        in_features = int(x_train_red.shape[1])
 
         param_grid = {
             'in_features': [in_features],  # Constant
@@ -69,14 +70,13 @@ class ReductionClusteringNN:
             'nn_size': [4],
             'learning_rate': [1e-6, 1e-5],
             'batch_size': [min(len(x_train), 1024)],
-            'epochs': [5000],
+            'epochs': [200],
             'verbose': [True]
         }
 
         gs = grid_search_nn(param_grid, x_train_red, y_train, x_val_red, y_val)
 
         self.nn = gs.best_model
-        self.n_classes = num_classes
         self.grid_search_table = {
             'best_accuracy': gs.best_accuracy,
             'best_kwargs': gs.best_kwargs,
@@ -118,7 +118,13 @@ class ReductionClusteringNN:
             x_concat = x_reduced.copy()
         else:
             clust_labels = self.clustering_alg.predict(x_reduced)
-            oh_features = one_hot(clust_labels, self.n_classes)
+
+            try:
+                n_clusters = self.clustering_alg.n_clusters
+            except AttributeError:
+                n_clusters = self.clustering_alg.n_components
+
+            oh_features = one_hot(clust_labels, n_clusters)
 
             if self.add_to_reduced_features:
                 x_concat = np.concatenate([x_reduced, oh_features], axis=1)
@@ -204,8 +210,11 @@ def _sync_reduction_clustering_nn(dataset_name: str,
     reduction_alg_name = reduction_alg.__class__.__name__
     clustering_alg_name = clustering_alg.__class__.__name__
 
-    joblib_path = reduction_and_nn_joblib(dataset_name, reduction_alg_name,
-                                          clustering_alg_name)
+    logging.info(f'_sync_reduction_clustering_nn() - {dataset_name} - '
+                 f'{reduction_alg_name} - {clustering_alg_name}')
+
+    joblib_path = reduction_clustering_nn_joblib(dataset_name, reduction_alg_name,
+                                                 clustering_alg_name)
     training_curve_path = training_curve(dataset_name, reduction_alg_name,
                                          clustering_alg_name)
     gs_json_path = grid_search_json(dataset_name, reduction_alg_name,
@@ -216,7 +225,8 @@ def _sync_reduction_clustering_nn(dataset_name: str,
 
     if not files_exist:
         # ReductionClusteringNN object
-        red_nn = ReductionClusteringNN(reduction_alg)
+        red_nn = ReductionClusteringNN(reduction_alg, clustering_alg,
+                                       add_to_reduced_features)
         red_nn.fit(x_train, y_train, x_val, y_val)
         joblib.dump(red_nn, joblib_path)
 
@@ -226,7 +236,7 @@ def _sync_reduction_clustering_nn(dataset_name: str,
 
         # Grid search JSON
         with open(gs_json_path, 'w') as fs:
-            json.dump(red_nn.grid_search_table, fs)
+            json.dump(red_nn.grid_search_table, fs, indent=4)
 
     red_nn = joblib.load(joblib_path)
     train_acc = accuracy_score(y_train, red_nn.predict(x_train))
@@ -258,8 +268,10 @@ def run_reduction_clustering_nn(dataset_name: str,
                                                        None)
 
         for clustering_class in clustering_classes:
-            clustering_alg = _sync_clusterer(clustering_class, dataset_name,
-                                             x_train, n_jobs)
+            postfix = reduction_alg.__class__.__name__
+            clustering_alg = _get_clusterer(clustering_class,
+                                            f'{dataset_name}-{postfix}',
+                                            x_reduced, n_jobs, False)
 
             for add_to_reduced_features in [False, True]:
                 dataset_name_ = dataset_name

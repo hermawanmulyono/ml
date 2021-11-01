@@ -6,7 +6,7 @@ from tasks.train_nn import run_reduction_and_nn, run_reduction_clustering_nn
 from utils.data import gen_3d_data, get_fashion_mnist_data
 from utils.plots import visualize_3d_data, visualize_fashion_mnist, \
     visualize_reduced_dataset3d, visualize_dataset3d_vectors, \
-    visualize_fashionmnist_vectors
+    visualize_fashionmnist_vectors, get_visualize_reduced_fashion_mnist_fn
 from tasks.dims_reduction import run_dim_reduction
 from tasks.clustering import run_clustering
 
@@ -47,7 +47,7 @@ def dataset1(n_jobs: int):
 
 def dataset2(n_jobs: int):
     x_train, y_train, x_val, y_val, x_test, y_test = get_fashion_mnist_data()
-    dataset_name = 'Fasihon-MNIST'
+    dataset_name = 'Fashion-MNIST'
 
     run_clustering(dataset_name, x_train, y_train, visualize_fashion_mnist,
                    n_jobs)
@@ -58,6 +58,10 @@ def dataset2(n_jobs: int):
                       sync=True,
                       n_jobs=n_jobs)
     run_reduction_and_nn(dataset_name, x_train, y_train, x_val, y_val, n_jobs)
+    run_reduction_and_clustering(
+        dataset_name, x_train, y_train,
+        get_visualize_reduced_fashion_mnist_fn(x_train),
+        visualize_fashionmnist_vectors, n_jobs)
     run_reduction_clustering_nn(dataset_name, x_train, y_train, x_val, y_val,
                                 n_jobs)
 
