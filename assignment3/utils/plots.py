@@ -210,6 +210,57 @@ def visualize_fashion_mnist(x_data: np.ndarray, y_data: np.ndarray,
     if x_data.shape[1] != 784:
         raise ValueError('x_data of Fashion-MNIST must be 784-dimensional')
 
+    return _tsne_fashion_mnist_visualization(x_data, y_data, x_data, categories)
+
+
+def get_visualize_reduced_fashion_mnist_fn(x_original: np.ndarray):
+    """Gets a function to visualize reduced Fashion-MNIST
+
+    A reduced Fashion-MNIST dataset is Fashion-MNIST after
+    a dimensionality reduction algorithm.
+
+    To visualize it, the t-SNE algorithm is used to map the
+    reduced data, `x_data` to a 2D plane. Then, the
+    visualization contains some thumbnails of the original
+    data.
+
+    Args:
+        x_original: The original features of shape
+            `(N, n_original_features)`. Note that
+            `n_original_features = 784`
+
+    Returns:
+        A function which takes `x_data, y_data, categories`
+            and returns a `go.Figure` object.
+
+    """
+
+    if x_original.shape[1] != 784:
+        raise ValueError('x_data of Fashion-MNIST must be 784-dimensional')
+
+    len_data = len(x_original)
+
+    def visualize_reduced_fashion_mnist(x_data: np.ndarray, y_data: np.ndarray,
+                                        categories: List[str]):
+
+        if len(x_data) != len_data:
+            raise ValueError(f'Expecting data of length {len_data}, but got'
+                             f'{len(x_data)}')
+
+        return _tsne_fashion_mnist_visualization(x_data, y_data, x_original,
+                                                 categories)
+
+    return visualize_reduced_fashion_mnist
+
+
+def _tsne_fashion_mnist_visualization(x_data: np.ndarray, y_data: np.ndarray,
+                                      x_original: np.ndarray,
+                                      categories: List[str]):
+    """Implementation of Fashion-MNIST t-SNE visualization,
+    but the interface is not compatible with the
+    visualization function interface.
+    """
+
     tsne = TSNE()
     transformed = tsne.fit_transform(x_data)
     assert len(transformed.shape) == 2
@@ -245,7 +296,7 @@ def visualize_fashion_mnist(x_data: np.ndarray, y_data: np.ndarray,
             shown_images = np.concatenate([shown_images, [transformed[i]]],
                                           axis=0)
 
-            x_disp = x_data[i]
+            x_disp = x_original[i]
             thumbnail = np.reshape(x_disp, (28, 28))
 
             imagebox = offsetbox.AnnotationBbox(
@@ -257,72 +308,6 @@ def visualize_fashion_mnist(x_data: np.ndarray, y_data: np.ndarray,
     adapter_figure = MatplotlibAdapter(fig, ax)
 
     return adapter_figure
-
-
-def get_visualize_reduced_fashion_mnist_fn(x_original: np.ndarray):
-
-    if x_original.shape[1] != 784:
-        raise ValueError('x_data of Fashion-MNIST must be 784-dimensional')
-
-    len_data = len(x_original)
-
-    def visualize_reduced_fashion_mnist(x_data: np.ndarray, y_data: np.ndarray,
-                                        categories: List[str]):
-
-        if len(x_data) != len_data:
-            raise ValueError(f'Expecting data of length {len_data}, but got'
-                             f'{len(x_data)}')
-
-        tsne = TSNE()
-        transformed = tsne.fit_transform(x_data)
-        assert len(transformed.shape) == 2
-
-        fig, ax = plt.subplots()
-        fig.set_size_inches(10, 10)
-        transformed = MinMaxScaler().fit_transform(transformed)
-
-        possible_labels = sorted(set(y_data))
-        if not ((0 <= min(possible_labels)) and
-                (max(possible_labels) < len(categories))):
-            raise ValueError(
-                f'Possible labels are not consistent with the labels {categories}'
-            )
-
-        original_indices = np.arange(len(x_data))
-
-        shown_images = np.array([[1.0, 1.0]])  # initially, just something big
-
-        for label in possible_labels:
-            category_name = categories[label]
-
-            selected_indices = original_indices[y_data == label]
-            x_selected = transformed[selected_indices]
-
-            plt.scatter(x_selected[:, 0], x_selected[:, 1], label=category_name)
-
-            for i in selected_indices:
-                # show an annotation box for a group of digits
-                dist = np.sum((transformed[i] - shown_images)**2, 1)
-                if np.min(dist) < 6e-3:
-                    # don't show points that are too close
-                    continue
-                shown_images = np.concatenate([shown_images, [transformed[i]]],
-                                              axis=0)
-
-                x_disp = x_original[i]
-                thumbnail = np.reshape(x_disp, (28, 28))
-
-                imagebox = offsetbox.AnnotationBbox(
-                    offsetbox.OffsetImage(thumbnail, cmap=plt.cm.gray_r),
-                    transformed[i])
-                ax.add_artist(imagebox)
-
-        ax.legend()
-        adapter_figure = MatplotlibAdapter(fig, ax)
-
-        return adapter_figure
-
-    return visualize_reduced_fashion_mnist
 
 
 def feature_importance_chart(feature_importances: np.ndarray):

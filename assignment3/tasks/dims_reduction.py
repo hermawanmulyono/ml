@@ -210,7 +210,7 @@ def reduce_ica(
         # Run ICA
         n_features = x_data.shape[1]
 
-        n_dims_list = list(range(1, n_features + 1))
+        n_dims_list = list(range(1, min(128, n_features + 1)))
 
         def args_generator():
             for _n_dims in n_dims_list:
