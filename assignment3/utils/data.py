@@ -28,8 +28,12 @@ def temp_seed(seed):
         np.random.set_state(state)
 
 
-def gen_3d_data(x1_size: float, x2_size: float, n_train: int, n_val: int,
-                n_test: int, noise_prob: float):
+def gen_3d_data(x1_size: float = 5,
+                x2_size: float = 2,
+                n_train: int = 5000,
+                n_val: int = 500,
+                n_test: int = 500,
+                noise_prob: float = 0.01):
     # _gen_3d_examples() is a deterministic function, so we cannot call it three
     # times to produce train, val, and test sets. The correct way to do it
     # is by producing all samples, then split to train, val, and test.
@@ -73,17 +77,17 @@ def _gen_3d_examples(x1_size: float, x2_size: float, num_examples: int,
     corr = 0.4 * std1 * std2
     cov_ = np.array([[std1**2, corr], [corr, std2**2]])
 
-    x1x2_data = np.random.multivariate_normal(mean_, cov_, size=num_examples)
+    # x1x2_data = np.random.multivariate_normal(mean_, cov_, size=num_examples)
 
-    x1_data = np.random.uniform(-x1_size/2, x1_size/2, size=num_examples)
-    x2_data = np.random.uniform(-x2_size/2, x2_size/2, size=num_examples)
+    x1_data = np.random.uniform(-x1_size / 2, x1_size / 2, size=num_examples)
+    x2_data = np.random.uniform(-x2_size / 2, x2_size / 2, size=num_examples)
     x1x2_data = np.stack([x1_data, x2_data], axis=-1)
 
     T = np.array([[1, 0], [1, 5]])
     T = T / np.linalg.norm(T, axis=1).reshape((-1, 1))
 
     x1x2_data = np.dot(T, x1x2_data.T)
-    x1x2_data = x1x2_data.T + [x1_size/2, x2_size/2]
+    x1x2_data = x1x2_data.T + [x1_size / 2, x2_size / 2]
 
     # Construct labels
     y_data = np.zeros((num_examples,))
@@ -99,10 +103,10 @@ def _gen_3d_examples(x1_size: float, x2_size: float, num_examples: int,
 
     y_data = y_data.astype(np.int)
 
-    x3_mean = y_data * 2 - 1  # Probability [0, 1] -> [-1, +1]
+    x3_mean = (y_data - 0.5) * 0.2  # Probability [0, 1] -> [-0.1, +0.1]
     # x3_mean = np.zeros((num_examples, ))
     # std = 2 * np.sqrt(0.25 - np.power(np.power(prob, 10000) - 0.5, 2))
-    std = 0.2
+    std = 0.1
     x3 = np.random.normal(x3_mean, std)
 
     x_data = np.concatenate([x1x2_data, x3.reshape((-1, 1))], axis=-1)
@@ -226,9 +230,7 @@ def _get_fashion_mnist_examples(train: bool):
 
     dir_name = 'mnist'
     os.makedirs(dir_name, exist_ok=True)
-    mnist = torchvision.datasets.FashionMNIST(dir_name,
-                                              train,
-                                              download=True)
+    mnist = torchvision.datasets.FashionMNIST(dir_name, train, download=True)
     x = np.stack([np.array(x).flatten().copy() for x, _ in mnist])
     y = np.array([y for _, y in mnist])
 

@@ -36,11 +36,17 @@ def visualize_3d_data(x_data: np.ndarray,
                                  scatter_alpha=scatter_alpha,
                                  scatter_size=4,
                                  categories=categories)
-    fig.update_layout(scene={
-        'xaxis_title': 'x1',
-        'yaxis_title': 'x2',
-        'zaxis_title': 'x3'
-    })
+    fig.update_layout(
+        scene={
+            'xaxis_title': 'x1',
+            'yaxis_title': 'x2',
+            'zaxis_title': 'x3',
+            'aspectratio': {
+                'x': 1,
+                'y': 1,
+                'z': 1
+            }  # Fixed aspect ratio
+        })
 
     return fig
 
@@ -55,6 +61,7 @@ def visualize_reduced_dataset3d(x_data: np.ndarray, y_data: np.ndarray,
         y_data: A (num_examples, ) array of labels
             corresponding to `x_data`. categories: Category
             names of the data, ordered by indices
+        categories: The category names in the dataset
 
     Returns:
         A plotly figure object
@@ -76,13 +83,17 @@ def visualize_reduced_dataset3d(x_data: np.ndarray, y_data: np.ndarray,
                                  scatter_size=4,
                                  categories=categories)
 
-    # updated_layout = {'xaxis_title': 'x1'}
-    # if n_dims >= 2:
-    #     updated_layout['yaxis_title'] = 'x2'
-    # if n_dims == 3:
-    #     updated_layout['zaxis_title'] = 'x3'
-    #
-    # fig.update_layout(updated_layout)
+    fig.update_layout(
+        scene={
+            'xaxis_title': 'x1',
+            'yaxis_title': 'x2',
+            'zaxis_title': 'x3',
+            'aspectratio': {
+                'x': 1,
+                'y': 1,
+                'z': 1
+            }  # Fixed aspect ratio
+        })
 
     return fig
 
@@ -341,6 +352,9 @@ def visualize_dataset3d_vectors(vectors: np.ndarray, x_data: np.ndarray,
 
     _validate_vector_visualization_inputs(vectors, x_data, y_data)
 
+    if x_data.shape[1] != 3:
+        raise ValueError('Expecting 3-dimensional x_data')
+
     # Calculate the length of vectors in figure
     scale = np.max(np.max(x_data, axis=0) - np.min(x_data, axis=0))
 
@@ -362,6 +376,18 @@ def visualize_dataset3d_vectors(vectors: np.ndarray, x_data: np.ndarray,
                          z=z_arrow,
                          mode='lines',
                          line={'width': 5}))
+
+    fig.update_layout(
+        scene={
+            'xaxis_title': 'x1',
+            'yaxis_title': 'x2',
+            'zaxis_title': 'x3',
+            'aspectratio': {
+                'x': 1,
+                'y': 1,
+                'z': 1
+            }  # Fixed aspect ratio
+        })
 
     return fig
 

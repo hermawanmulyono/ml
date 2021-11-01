@@ -100,14 +100,18 @@ def reduce_pca(
         # Run PCA
         n_features = x_data.shape[1]
 
-        n_dims_list = list(range(1, min(64, n_features) + 1))
+        n_dims_list = list(range(1, n_features + 1))
 
         def args_generator():
             for n_dims in n_dims_list:
                 yield x_data, n_dims
 
-        with Pool(n_jobs) as pool:
-            tuples = pool.starmap(_fit_pca, args_generator())
+        # tuples = [..., (clusterer, score), ...]
+        if n_jobs == 1:
+            tuples = [_fit_pca(*args) for args in args_generator()]
+        else:
+            with Pool(n_jobs) as pool:
+                tuples = pool.starmap(_fit_pca, args_generator())
 
         pcas, errors = zip(*tuples)
 
@@ -155,7 +159,7 @@ def _fit_pca(x_data, n_dims):
         (pca, reconstruction_error) tuple
 
     """
-    print(f'Running ICA {n_dims} dimensions')
+    print(f'Running PCA {n_dims} dimensions')
 
     pca = PCA(n_dims)
     pca.fit(x_data)
@@ -206,14 +210,18 @@ def reduce_ica(
         # Run ICA
         n_features = x_data.shape[1]
 
-        n_dims_list = list(range(1, min(64, n_features) + 1))
+        n_dims_list = list(range(1, n_features + 1))
 
         def args_generator():
             for _n_dims in n_dims_list:
                 yield x_data, _n_dims
 
-        with Pool(n_jobs) as pool:
-            tuples = pool.starmap(_fit_ica, args_generator())
+        # tuples = [..., (clusterer, score), ...]
+        if n_jobs == 1:
+            tuples = [_fit_ica(*args) for args in args_generator()]
+        else:
+            with Pool(n_jobs) as pool:
+                tuples = pool.starmap(_fit_ica, args_generator())
 
         icas, mean_abs_kurtosis = zip(*tuples)
 
@@ -316,8 +324,12 @@ def reduce_rp(
             for n_dims in n_dims_list:
                 yield x_data, n_dims
 
-        with Pool(n_jobs) as pool:
-            tuples = pool.starmap(_fit_rp, args_generator())
+        # tuples = [..., (clusterer, score), ...]
+        if n_jobs == 1:
+            tuples = [_fit_rp(*args) for args in args_generator()]
+        else:
+            with Pool(n_jobs) as pool:
+                tuples = pool.starmap(_fit_rp, args_generator())
 
         rps, errors = zip(*tuples)
 

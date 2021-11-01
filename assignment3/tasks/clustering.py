@@ -96,9 +96,12 @@ def _get_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray,
             for n_cluster in n_clusters:
                 yield alg, n_cluster, x_train
 
-        with Pool(n_jobs) as pool:
-            # tuples = [..., (clusterer, score), ...]
-            tuples = pool.starmap(_cluster_data, args_generator())
+        # tuples = [..., (clusterer, score), ...]
+        if n_jobs == 1:
+            tuples = [_cluster_data(*args) for args in args_generator()]
+        else:
+            with Pool(n_jobs) as pool:
+                tuples = pool.starmap(_cluster_data, args_generator())
 
         clusterers, clustering_scores = zip(*tuples)
 
@@ -157,9 +160,10 @@ def _best_clustering_index(clustering_scores: List[float]) -> int:
     return int(best_index)
 
 
-def _cluster_data(alg, n_cluster, x_train):
+def _cluster_data(alg, n_clusters, x_train):
     """Function for clustering with multiprocessing purposes"""
-    clusterer = alg(n_cluster)
+
+    clusterer = alg(n_clusters)
     cluster_labels = clusterer.fit_predict(x_train)
 
     score = silhouette_score(x_train, cluster_labels)

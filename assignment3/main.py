@@ -23,15 +23,7 @@ def parse_args():
 
 
 def dataset1(n_jobs: int):
-    x1_size = 5
-    x2_size = 2
-    n_train = 5000
-    n_val = 500
-    n_test = 500
-    noise_prob = 0.01
-
-    x_train, y_train, x_val, y_val, x_test, y_test = gen_3d_data(
-        x1_size, x2_size, n_train, n_val, n_test, noise_prob)
+    x_train, y_train, x_val, y_val, x_test, y_test = gen_3d_data()
     dataset_name = 'Dataset3D'
     run_clustering(dataset_name, x_train, y_train, visualize_3d_data, n_jobs)
     run_dim_reduction(dataset_name,
