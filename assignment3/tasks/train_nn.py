@@ -134,6 +134,16 @@ class ReductionClusteringNN:
         return x_concat
 
 
+def run_baseline_nn(dataset_name: str,
+                    x_train: np.ndarray,
+                    y_train: np.ndarray,
+                    x_val: np.ndarray,
+                    y_val: np.ndarray,
+                    n_jobs=1):
+    _sync_reduction_clustering_nn(dataset_name, x_train, y_train, x_val, y_val,
+                                  None, None)
+
+
 def run_reduction_and_nn(dataset_name: str,
                          x_train: np.ndarray,
                          y_train: np.ndarray,
@@ -176,8 +186,8 @@ def _sync_reduction_clustering_nn(dataset_name: str,
                                   y_train: np.ndarray,
                                   x_val: np.ndarray,
                                   y_val: np.ndarray,
-                                  reduction_alg,
-                                  clustering_alg,
+                                  reduction_alg: Optional,
+                                  clustering_alg: Optional,
                                   add_to_reduced_features: bool = False):
     """Synchronizes dimensionality reduction and NN outputs
 
@@ -213,7 +223,8 @@ def _sync_reduction_clustering_nn(dataset_name: str,
     logging.info(f'_sync_reduction_clustering_nn() - {dataset_name} - '
                  f'{reduction_alg_name} - {clustering_alg_name}')
 
-    joblib_path = reduction_clustering_nn_joblib(dataset_name, reduction_alg_name,
+    joblib_path = reduction_clustering_nn_joblib(dataset_name,
+                                                 reduction_alg_name,
                                                  clustering_alg_name)
     training_curve_path = training_curve(dataset_name, reduction_alg_name,
                                          clustering_alg_name)

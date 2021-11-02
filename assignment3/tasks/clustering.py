@@ -36,6 +36,7 @@ def run_clustering(dataset_name: str,
     clustering_algs = [KMeans, GaussianMixture]
 
     # TODO: Gaussian Mixture other than "full"
+    # TODO: Clustering evaluation
 
     for alg in clustering_algs:
         logging.info(f'run_clustering() - {dataset_name} - {alg.__name__}')
@@ -90,7 +91,7 @@ def _get_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray,
 
     else:
         # Create a clusterer which maximizes the clustering score.
-        n_clusters = list(range(2, 17))
+        n_clusters = list(range(3, 17))
 
         def args_generator():
             for n_cluster in n_clusters:
@@ -135,6 +136,7 @@ def _best_clustering_index(clustering_scores: List[float]) -> int:
 
     # Temporarily assign to the absolute best
     best_index = int(np.argmax(clustering_scores))
+    return best_index
 
     indices = np.arange(len(clustering_scores))
     x = np.array(clustering_scores)
@@ -153,8 +155,12 @@ def _best_clustering_index(clustering_scores: List[float]) -> int:
 
         # This local best index needs to be at lest 75% of the global maximum
         local_maximum = clustering_scores[best_index_]
-        global_maximum = clustering_scores[best_index]
-        if local_maximum >= 0.75 * global_maximum:
+
+        global_maximum = np.max(clustering_scores)
+        global_minimum = np.min(clustering_scores)
+        delta = global_maximum - global_minimum
+
+        if local_maximum >= global_maximum - 0.5 * delta:
             best_index = best_index_
 
     return int(best_index)

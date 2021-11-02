@@ -2,7 +2,8 @@ import argparse
 import logging
 
 from tasks.reduction_and_clustering import run_reduction_and_clustering
-from tasks.train_nn import run_reduction_and_nn, run_reduction_clustering_nn
+from tasks.train_nn import run_reduction_and_nn, run_reduction_clustering_nn, \
+    run_baseline_nn
 from utils.data import gen_3d_data, get_fashion_mnist_data
 from utils.plots import visualize_3d_data, visualize_fashion_mnist, \
     visualize_reduced_dataset3d, visualize_dataset3d_vectors, \
@@ -19,9 +20,9 @@ def parse_args():
                         default=1,
                         type=int,
                         help='Number of Python processes to use. For some '
-                             'reason, this only works on Windows. Ubuntu '
-                             '18.04 always uses all the cores when using '
-                             'Scikit-Learn.')
+                        'reason, this only works on Windows. Ubuntu '
+                        '18.04 always uses all the cores when using '
+                        'Scikit-Learn.')
     args = parser.parse_args()
 
     if windows:
@@ -40,7 +41,6 @@ def dataset1(n_jobs: int):
 
     if windows:
         visualize_3d_data(x_train, y_train, ['negative', 'positive']).show()
-        exit()
 
     run_clustering(dataset_name, x_train, y_train, visualize_3d_data, n_jobs)
     run_dim_reduction(dataset_name,
@@ -67,12 +67,19 @@ def dataset2(n_jobs: int):
                       sync=True,
                       n_jobs=n_jobs)
     run_reduction_and_nn(dataset_name, x_train, y_train, x_val, y_val, n_jobs)
+
+    # Task 4
     run_reduction_and_clustering(
         dataset_name, x_train, y_train,
         get_visualize_reduced_fashion_mnist_fn(x_train),
         visualize_fashionmnist_vectors, n_jobs)
+
+    # Task 5
     run_reduction_clustering_nn(dataset_name, x_train, y_train, x_val, y_val,
                                 n_jobs)
+
+    # Baseline NN without reduction or clustering
+    run_baseline_nn(dataset_name, x_train, y_train, x_val, y_val, n_jobs)
 
 
 def main():

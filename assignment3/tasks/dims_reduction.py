@@ -132,7 +132,7 @@ def reduce_pca(
         # Save raw data as JSON
         explained_variance = pcas[-1].explained_variance_.tolist()
         d = {
-            'n_components': pca.n_components_,
+            'n_components': int(pca.n_components_),
             'reconstruction_error': error,
             'explained_variance': explained_variance
         }
@@ -210,7 +210,7 @@ def reduce_ica(
         # Run ICA
         n_features = x_data.shape[1]
 
-        n_dims_list = list(range(1, min(128, n_features + 1)))
+        n_dims_list = list(range(1, min(256, n_features + 1)))
 
         def args_generator():
             for _n_dims in n_dims_list:

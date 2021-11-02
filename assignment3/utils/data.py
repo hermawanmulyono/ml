@@ -83,7 +83,7 @@ def _gen_3d_examples(x1_size: float, x2_size: float, num_examples: int,
     x2_data = np.random.uniform(-x2_size / 2, x2_size / 2, size=num_examples)
     x1x2_data = np.stack([x1_data, x2_data], axis=-1)
 
-    T = np.array([[1, 0], [1, 5]])
+    T = np.array([[5, 1], [1, 5]])
     T = T / np.linalg.norm(T, axis=1).reshape((-1, 1))
 
     x1x2_data = np.dot(T, x1x2_data.T)
@@ -103,7 +103,7 @@ def _gen_3d_examples(x1_size: float, x2_size: float, num_examples: int,
 
     y_data = y_data.astype(np.int)
 
-    x3_mean = (y_data - 0.5) * 0.2  # Probability [0, 1] -> [-1, +1]
+    x3_mean = (y_data - 0.5)  # Probability [0, 1] -> [-0.5 +0.5]
     # x3_mean = np.zeros((num_examples, ))
     # std = 2 * np.sqrt(0.25 - np.power(np.power(prob, 10000) - 0.5, 2))
     std = 0.1
@@ -124,7 +124,7 @@ def _ground_truth_proba(x_data: np.ndarray, x1_size: float, x2_size: float):
 
     Returns:
         Logits of `x_data`. They can be converted to
-            qprobabilities or labels.
+            probabilities or labels.
 
     """
     x1 = x_data[:, 0]
