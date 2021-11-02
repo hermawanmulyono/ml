@@ -9,6 +9,7 @@ from utils.plots import visualize_3d_data, visualize_fashion_mnist, \
     visualize_fashionmnist_vectors, get_visualize_reduced_fashion_mnist_fn
 from tasks.dims_reduction import run_dim_reduction
 from tasks.clustering import run_clustering
+from utils.outputs import windows
 
 
 def parse_args():
@@ -17,14 +18,30 @@ def parse_args():
                         '--n_jobs',
                         default=1,
                         type=int,
-                        help='Number of Python processes to use')
+                        help='Number of Python processes to use. For some '
+                             'reason, this only works on Windows. Ubuntu '
+                             '18.04 always uses all the cores when using '
+                             'Scikit-Learn.')
     args = parser.parse_args()
-    return args.n_jobs
+
+    if windows:
+        n_jobs = args.n_jobs
+    else:
+        # There is an unexpected behaviour in Linux where the Scikit-Learn
+        # library uses all the cores without user specification
+        n_jobs = 1
+
+    return n_jobs
 
 
 def dataset1(n_jobs: int):
     x_train, y_train, x_val, y_val, x_test, y_test = gen_3d_data()
     dataset_name = 'Dataset3D'
+
+    if windows:
+        visualize_3d_data(x_train, y_train, ['negative', 'positive']).show()
+        exit()
+
     run_clustering(dataset_name, x_train, y_train, visualize_3d_data, n_jobs)
     run_dim_reduction(dataset_name,
                       x_train,

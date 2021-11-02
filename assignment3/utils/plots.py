@@ -41,11 +41,7 @@ def visualize_3d_data(x_data: np.ndarray,
             'xaxis_title': 'x1',
             'yaxis_title': 'x2',
             'zaxis_title': 'x3',
-            'aspectratio': {
-                'x': 1,
-                'y': 1,
-                'z': 1
-            }  # Fixed aspect ratio
+            'aspectmode': 'data'  # Fixed aspect ratio
         })
 
     return fig
@@ -88,11 +84,7 @@ def visualize_reduced_dataset3d(x_data: np.ndarray, y_data: np.ndarray,
             'xaxis_title': 'x1',
             'yaxis_title': 'x2',
             'zaxis_title': 'x3',
-            'aspectratio': {
-                'x': 1,
-                'y': 1,
-                'z': 1
-            }  # Fixed aspect ratio
+            'aspectmode': 'data'  # Fixed aspect ratio
         })
 
     return fig
@@ -367,11 +359,7 @@ def visualize_dataset3d_vectors(vectors: np.ndarray, x_data: np.ndarray,
             'xaxis_title': 'x1',
             'yaxis_title': 'x2',
             'zaxis_title': 'x3',
-            'aspectratio': {
-                'x': 1,
-                'y': 1,
-                'z': 1
-            }  # Fixed aspect ratio
+            'aspectmode': 'data'  # Fixed aspect ratio
         })
 
     return fig

@@ -103,7 +103,7 @@ def _gen_3d_examples(x1_size: float, x2_size: float, num_examples: int,
 
     y_data = y_data.astype(np.int)
 
-    x3_mean = (y_data - 0.5) * 0.2  # Probability [0, 1] -> [-0.1, +0.1]
+    x3_mean = (y_data - 0.5) * 0.2  # Probability [0, 1] -> [-1, +1]
     # x3_mean = np.zeros((num_examples, ))
     # std = 2 * np.sqrt(0.25 - np.power(np.power(prob, 10000) - 0.5, 2))
     std = 0.1

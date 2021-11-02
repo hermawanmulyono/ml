@@ -15,7 +15,7 @@ from utils.dtfilter import DTFilter
 from utils.gaussian_rp import GaussianRP
 from utils.outputs import reduction_alg_joblib, reconstruction_error_png, \
     reduction_json, kurtosis_png, feature_importances_png, \
-    vector_visualization_png
+    vector_visualization_png, windows
 from utils.plots import simple_line_plot, feature_importance_chart
 
 # Vector visualization function
@@ -118,7 +118,6 @@ def reduce_pca(
         # Store PCA joblib. Just pick at least 0.95 explained variance.
         pca, error = _fit_pca(x_data, 0.95)
 
-        chosen_index = 1
         joblib.dump(pca, joblib_path)
 
         # Store the projection vector visualization
@@ -133,7 +132,8 @@ def reduce_pca(
         # Save raw data as JSON
         explained_variance = pcas[-1].explained_variance_.tolist()
         d = {
-            'reconstruction_error': errors[chosen_index],
+            'n_components': pca.n_components_,
+            'reconstruction_error': error,
             'explained_variance': explained_variance
         }
 

@@ -8,6 +8,12 @@ from typing import Optional
 OUTPUT_DIRECTORY = 'outputs'
 os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
 
+
+# Some image outputs may be visualized if the operating system is Windows
+# as it has GUI.
+windows = (os.name == 'nt')
+
+
 ############################################################
 # Clustering
 ############################################################

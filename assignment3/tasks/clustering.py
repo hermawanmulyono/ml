@@ -12,7 +12,7 @@ from sklearn.metrics import silhouette_score, rand_score
 from sklearn.mixture import GaussianMixture
 
 from utils.outputs import clusterer_joblib, clustering_score_png, \
-    clustering_visualization_png, clustering_evaluation_json
+    clustering_visualization_png, clustering_evaluation_json, windows
 from utils.plots import simple_line_plot
 
 ClusteringAlg = Union[KMeans, GaussianMixture]
@@ -199,6 +199,9 @@ def _sync_clustering_visualization(dataset_name: str, x_train: np.ndarray,
         categories = [f'cluster_{c}' for c in all_labels]
         fig = visualization_fn(x_train, pred_labels, categories)
         fig.write_image(png_path)
+
+        if windows:
+            fig.show()
 
 
 def _sync_cluster_evaluation(dataset_name: str, x_data: np.ndarray,

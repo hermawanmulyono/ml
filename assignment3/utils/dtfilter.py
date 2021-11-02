@@ -8,7 +8,7 @@ from utils.data import check_input
 
 
 class DTFilter:
-    def __init__(self, threshold=0.5):
+    def __init__(self, threshold=0.8):
         self._threshold = threshold
         self._selected_features: Optional[List[int]] = None
         self._dt: Optional[DecisionTreeClassifier] = None
