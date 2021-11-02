@@ -70,7 +70,7 @@ class ReductionClusteringNN:
             'nn_size': [4],
             'learning_rate': [1e-6, 5e-6, 1e-5],
             'batch_size': [min(len(x_train), 1024)],
-            'epochs': [8000],
+            'epochs': [100000],
             'verbose': [True]
         }
 
