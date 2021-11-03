@@ -42,13 +42,18 @@ def dataset1(n_jobs: int):
     if windows:
         visualize_3d_data(x_train, y_train, ['negative', 'positive']).show()
 
+    # Task 1
     run_clustering(dataset_name, x_train, y_train, visualize_3d_data, n_jobs)
+
+    # Task 2
     run_dim_reduction(dataset_name,
                       x_train,
                       y_train,
                       visualize_dataset3d_vectors,
                       sync=True,
                       n_jobs=n_jobs)
+
+    # Task 3
     run_reduction_and_clustering(dataset_name, x_train, y_train,
                                  visualize_reduced_dataset3d,
                                  visualize_dataset3d_vectors, n_jobs)
@@ -58,14 +63,19 @@ def dataset2(n_jobs: int):
     x_train, y_train, x_val, y_val, x_test, y_test = get_fashion_mnist_data()
     dataset_name = 'Fashion-MNIST'
 
+    # Task 1
     run_clustering(dataset_name, x_train, y_train, visualize_fashion_mnist,
                    n_jobs)
+
+    # Task 2
     run_dim_reduction(dataset_name,
                       x_train,
                       y_train,
                       visualize_fashionmnist_vectors,
                       sync=True,
                       n_jobs=n_jobs)
+
+    # Task 3
     run_reduction_and_nn(dataset_name, x_train, y_train, x_val, y_val, n_jobs)
 
     # Task 4

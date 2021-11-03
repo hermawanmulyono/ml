@@ -43,13 +43,9 @@ def run_dim_reduction(dataset_name: str,
               vector_visualization_fn)
 
 
-def reduce_pca(
-        dataset_name: str,
-        x_data: np.ndarray,
-        y_data: np.ndarray,
-        sync: bool,
-        n_jobs,
-        vector_visualization_fn: Optional[VectorVisualizationFunction]):
+def reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
+               sync: bool, n_jobs,
+               vector_visualization_fn: Optional[VectorVisualizationFunction]):
     """Reduces the `x_data` to `n_dims` dimensions.
 
     This function uses the PCA algorithm.
@@ -177,13 +173,9 @@ def _reconstruct_pca(pca: PCA, X: np.ndarray):
     return x_rec
 
 
-def reduce_ica(
-        dataset_name: str,
-        x_data: np.ndarray,
-        y_data: np.ndarray,
-        sync: bool,
-        n_jobs: int,
-        vector_visualization_fn: Optional[VectorVisualizationFunction]):
+def reduce_ica(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
+               sync: bool, n_jobs: int,
+               vector_visualization_fn: Optional[VectorVisualizationFunction]):
     logging.info(f'ICA - {dataset_name}')
 
     check_input(x_data)
@@ -249,6 +241,9 @@ def reduce_ica(
         fig = vector_visualization_fn(mixing_vectors, x_data, y_data)
         fig.write_image(vector_viz_path)
 
+        if windows:
+            fig.show()
+
     x_reduced = ica.transform(x_data)
 
     return x_reduced, ica
@@ -285,13 +280,9 @@ def _fit_ica(x_data: np.ndarray, n_dims: int):
     return ica, mean_abs_kurtosis
 
 
-def reduce_rp(
-        dataset_name: str,
-        x_data: np.ndarray,
-        y_data: np.ndarray,
-        sync: bool,
-        n_jobs: int,
-        vector_visualization_fn: Optional[VectorVisualizationFunction]):
+def reduce_rp(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
+              sync: bool, n_jobs: int,
+              vector_visualization_fn: Optional[VectorVisualizationFunction]):
     logging.info(f'Random Projection - {dataset_name}')
 
     check_input(x_data)
@@ -321,8 +312,9 @@ def reduce_rp(
         # TODO: Run GaussianRP many times
 
         def args_generator():
+            repeats = 10
             for n_dims in n_dims_list:
-                yield x_data, n_dims
+                yield x_data, n_dims, repeats
 
         # tuples = [..., (clusterer, score), ...]
         if n_jobs == 1:
@@ -333,10 +325,12 @@ def reduce_rp(
 
         rps, errors = zip(*tuples)
 
-        # Pick RP such that its reconstruction error is <= 0.5
-        error_threshold = 0.1
-        errors_np = np.array(errors)
-        good_indices = np.arange(len(errors))[errors_np <= error_threshold]
+        # Pick RP such that its reconstruction error is <= 0.15
+        error_threshold = 0.15
+        all_errors_np = np.array(errors)
+        best_errors_np = np.min(all_errors_np, axis=1)
+
+        good_indices = np.arange(len(errors))[best_errors_np <= error_threshold]
         best_index = int(np.min(good_indices))
         best_rp: GaussianRP = rps[best_index]
 
@@ -348,9 +342,13 @@ def reduce_rp(
         fig.write_image(vector_viz_path)
 
         # Save reconstruction error plot
-        fig = simple_line_plot(n_dims_list, errors, 'n_components',
-                               'reconstruction_error')
+        fig = simple_line_plot(n_dims_list, all_errors_np.mean(axis=1),
+                               'n_components', 'reconstruction_error',
+                               all_errors_np.std(axis=1))
         fig.write_image(rec_error_path)
+
+        if windows:
+            fig.show()
 
         # Save raw data as JSON
         d = {'reconstruction_error': errors[best_index]}
@@ -364,7 +362,7 @@ def reduce_rp(
     return x_reduced, dim_red_alg
 
 
-def _fit_rp(x_data, n_dims):
+def _fit_rp(x_data, n_dims, repeats=1):
     """Fits a random projection model
 
     This function can be parallelized with multiprocessing.
@@ -372,21 +370,34 @@ def _fit_rp(x_data, n_dims):
     Args:
         x_data: (N, n_features) feature array
         n_dims: Number of random projection vectors
+        repeats: How many times the random projection is
+            fitted
 
     Returns:
-        (rp, reconstruction_error) tuple
+        (rp, errors) tuple, where `errors` is a list of
+            reconstruction errors over `repeats`
+            experiments.
 
     """
     print(f'Running RP {n_dims} dimensions')
 
-    rp = GaussianRP(n_dims)
-    rp.fit(x_data)
+    errors = []
+    best_rp = None
 
-    x_rec = rp.reconstruct(x_data)
-    reconstruction_error = _reconstruction_error(x_data - rp.mean_,
-                                                 x_rec - rp.mean_)
+    for _ in range(repeats):
+        rp = GaussianRP(n_dims)
+        rp.fit(x_data)
 
-    return rp, reconstruction_error
+        x_rec = rp.reconstruct(x_data)
+        reconstruction_error = _reconstruction_error(x_data - rp.mean_,
+                                                     x_rec - rp.mean_)
+
+        if (best_rp is None) or (reconstruction_error < np.min(errors)):
+            best_rp = rp
+
+        errors.append(reconstruction_error)
+
+    return best_rp, errors
 
 
 def _reconstruction_error(x_data: np.ndarray, x_rec: np.ndarray):
@@ -403,13 +414,9 @@ def _reconstruction_error(x_data: np.ndarray, x_rec: np.ndarray):
     return error
 
 
-def reduce_dt(
-        dataset_name: str,
-        x_data: np.ndarray,
-        y_data: np.ndarray,
-        sync: bool,
-        n_jobs: int,
-        vector_visualization_fn: Optional[VectorVisualizationFunction]):
+def reduce_dt(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
+              sync: bool, n_jobs: int,
+              vector_visualization_fn: Optional[VectorVisualizationFunction]):
 
     logging.info(f'DT - {dataset_name}')
 

@@ -106,8 +106,11 @@ def _gen_3d_examples(x1_size: float, x2_size: float, num_examples: int,
     x3_mean = (y_data - 0.5)  # Probability [0, 1] -> [-0.5 +0.5]
     # x3_mean = np.zeros((num_examples, ))
     # std = 2 * np.sqrt(0.25 - np.power(np.power(prob, 10000) - 0.5, 2))
-    std = 0.1
-    x3 = np.random.normal(x3_mean, std)
+    std = 0.2
+    x3 = x3_mean - np.sign(y_data - 0.5) * np.abs(
+        np.random.normal(0, std, size=(num_examples, )))
+    x3 = np.clip(x3, a_min=-0.5, a_max=0.5)
+    # x3 = np.random.normal(x3_mean, std)
 
     x_data = np.concatenate([x1x2_data, x3.reshape((-1, 1))], axis=-1)
 

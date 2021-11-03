@@ -135,7 +135,7 @@ def _add_scatter_dataset3d(fig: go.Figure, x_data, y_data, scatter_alpha: float,
     return fig
 
 
-def simple_line_plot(x, y, x_title: str, y_title: str) -> go.Figure:
+def simple_line_plot(x, y, x_title: str, y_title: str, error=None) -> go.Figure:
     """Generates a simple line plot
 
     Args:
@@ -143,13 +143,37 @@ def simple_line_plot(x, y, x_title: str, y_title: str) -> go.Figure:
         y: y-axis data
         x_title: x-axis title
         y_title: y-axis title
+        error: Optional error vector. If given, continuous
+            error bar will be added.
 
     Returns:
         A go.Figure object with corresponding x and y data.
 
     """
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=x, y=y))
+    fig.add_trace(go.Scatter(x=x, y=y, line={'color': 'rgb(0,100,80)'}))
+
+    if error is not None:
+        error_np = np.array(error)
+        x_np = np.array(x)
+        y_np = np.array(y)
+
+        # x, then x reversed
+        xx = np.concatenate([x_np, x_np[::-1]], axis=0)
+
+        # upper then lower
+        yy = np.concatenate([y_np + error_np, y_np[::-1] - error_np[::-1]],
+                            axis=0)
+
+        fig.add_trace(
+            go.Scatter(x=xx,
+                       y=yy,
+                       fill='toself',
+                       fillcolor='rgba(0,100,80,0.2)',
+                       line=dict(color='rgba(255,255,255,0)'),
+                       hoverinfo="skip",
+                       showlegend=False))
+
     fig.update_layout({'xaxis_title': x_title, 'yaxis_title': y_title})
     return fig
 
