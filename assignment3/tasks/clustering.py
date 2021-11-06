@@ -8,7 +8,8 @@ import joblib
 import numpy as np
 from plotly import graph_objects as go
 from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score, rand_score
+from sklearn.metrics import silhouette_score, rand_score, homogeneity_score, \
+    completeness_score, v_measure_score
 from sklearn.mixture import GaussianMixture
 
 from utils.outputs import clusterer_joblib, clustering_score_png, \
@@ -219,8 +220,14 @@ def _sync_cluster_evaluation(dataset_name: str, x_data: np.ndarray,
     if not os.path.exists(json_path):
         y_pred = clusterer.predict(x_data)
         random_index = rand_score(y_data, y_pred)
+        homogeneity = homogeneity_score(y_data, y_pred)
+        completeness = completeness_score(y_data, y_pred)
+        v_measure = v_measure_score(y_data, y_pred)
 
-        d = {'random_index': random_index}
+        d = {'random_index': random_index,
+             'homogeneity': homogeneity,
+             'completeness': completeness,
+             'v_measure': v_measure}
 
         with open(json_path, 'w') as fs:
-            json.dump(d, fs)
+            json.dump(d, fs, indent=4)

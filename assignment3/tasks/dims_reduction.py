@@ -72,6 +72,8 @@ def reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
 
     """
 
+    # TODO: Plot PCA variance distribution
+
     logging.info(f'PCA - {dataset_name}')
 
     check_input(x_data)
@@ -120,12 +122,16 @@ def reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
         fig = vector_visualization_fn(pca.components_, x_data, y_data)
         fig.write_image(vector_viz_path)
 
+        if windows:
+            fig.show()
+
         # Save reconstruction error plot
         fig = simple_line_plot(n_dims_list, errors, 'n_components',
                                'reconstruction_error')
         fig.write_image(rec_error_path)
 
         # Save raw data as JSON
+        # This can be moved down there
         explained_variance = pcas[-1].explained_variance_.tolist()
         d = {
             'n_components': int(pca.n_components_),

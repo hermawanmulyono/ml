@@ -67,10 +67,10 @@ class ReductionClusteringNN:
         param_grid = {
             'in_features': [in_features],  # Constant
             'num_classes': [num_classes],  # Constant
-            'nn_size': [4],
+            'nn_size': [2, 4, 8],
             'learning_rate': [1e-6, 5e-6, 1e-5],
-            'batch_size': [min(len(x_train), 1024)],
-            'epochs': [100000],
+            'batch_size': [min(len(x_train), 128)],
+            'epochs': [3000],
             'verbose': [True]
         }
 
