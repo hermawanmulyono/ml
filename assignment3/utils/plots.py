@@ -229,6 +229,30 @@ def visualize_fashion_mnist(x_data: np.ndarray, y_data: np.ndarray,
     return _tsne_fashion_mnist_visualization(x_data, y_data, x_data, categories)
 
 
+def get_visualize_reduced_dataset3d_fn(x_original: np.ndarray):
+    if x_original.shape[1] != 3:
+        raise ValueError('x_data of Dataset3D must be 784-dimensional')
+
+    len_data = len(x_original)
+
+    def visualize_reduced_dataset3d_fn(x_data: np.ndarray, y_data: np.ndarray,
+                                       categories: List[str]):
+
+        if len(x_data) != len_data:
+            raise ValueError(f'Expecting data of length {len_data}, but got'
+                             f'{len(x_data)}')
+
+        # With original space
+        fig1 = visualize_3d_data(x_original, y_data, categories)
+
+        # With reduced space
+        fig2 = visualize_reduced_dataset3d(x_data, y_data, categories)
+
+        return fig1, fig2
+
+    return visualize_reduced_dataset3d_fn
+
+
 def get_visualize_reduced_fashion_mnist_fn(x_original: np.ndarray):
     """Gets a function to visualize reduced Fashion-MNIST
 
@@ -263,8 +287,14 @@ def get_visualize_reduced_fashion_mnist_fn(x_original: np.ndarray):
             raise ValueError(f'Expecting data of length {len_data}, but got'
                              f'{len(x_data)}')
 
-        return _tsne_fashion_mnist_visualization(x_data, y_data, x_original,
+        # With original space
+        fig1 = _tsne_fashion_mnist_visualization(x_original, y_data, x_original,
                                                  categories)
+
+        # With reduced space
+        fig2 = _tsne_fashion_mnist_visualization(x_data, y_data, x_original,
+                                                 categories)
+        return fig1, fig2
 
     return visualize_reduced_fashion_mnist
 

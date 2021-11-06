@@ -8,11 +8,9 @@ from typing import Optional
 OUTPUT_DIRECTORY = 'outputs'
 os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
 
-
 # Some image outputs may be visualized if the operating system is Windows
 # as it has GUI.
 windows = (os.name == 'nt')
-
 
 ############################################################
 # Clustering
@@ -30,6 +28,12 @@ def clustering_score_png(dataset_name: str, alg_name: str):
 def clustering_visualization_png(dataset_name: str, alg_name: str):
     return f'{OUTPUT_DIRECTORY}/{dataset_name}_' \
            f'{alg_name}_clustering_visualization.png'
+
+
+def clustering_visualization_reduced_space_png(dataset_name: str,
+                                               alg_name: str):
+    return f'{OUTPUT_DIRECTORY}/{dataset_name}_' \
+           f'{alg_name}_clustering_visualization_reduced_space.png'
 
 
 def clustering_evaluation_json(dataset_name: str, alg_name: str):

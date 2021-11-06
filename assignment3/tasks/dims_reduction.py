@@ -208,7 +208,8 @@ def reduce_ica(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
         # Run ICA
         n_features = x_data.shape[1]
 
-        n_dims_list = list(range(1, min(256, n_features + 1)))
+        steps = int(np.ceil(n_features / 32))
+        n_dims_list = list(range(1, n_features + 1, steps))
 
         def args_generator():
             for _n_dims in n_dims_list:

@@ -9,7 +9,7 @@ clustering algorithms. There are 16 possible combinations.
 
 import numpy as np
 
-from tasks.clustering import ClusteringVisualizationFunc, run_clustering
+from tasks.clustering import ReducedClusteringVisualizationFunc, run_clustering
 from tasks.dims_reduction import reduce_pca, reduce_ica, reduce_rp, reduce_dt, \
     VectorVisualizationFunction
 
@@ -18,7 +18,7 @@ def run_reduction_and_clustering(
         dataset_name: str,
         x_data: np.ndarray,
         y_data: np.ndarray,
-        clustering_visualization_fn: ClusteringVisualizationFunc,
+        clustering_visualization_fn: ReducedClusteringVisualizationFunc,
         vector_visualization_fn: VectorVisualizationFunction,
         n_jobs=1):
 
@@ -33,4 +33,4 @@ def run_reduction_and_clustering(
                                                        vector_visualization_fn)
         postfix = reduction_alg.__class__.__name__
         run_clustering(f'{dataset_name}-{postfix}', x_reduced, y_data,
-                       clustering_visualization_fn, n_jobs)
+                       clustering_visualization_fn, n_jobs, is_reduced=True)

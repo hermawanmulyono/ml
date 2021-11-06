@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from multiprocessing import Pool
-from typing import Union, Callable, List, Type
+from typing import Union, Callable, List, Type, Tuple
 
 import joblib
 import numpy as np
@@ -13,12 +13,11 @@ from sklearn.metrics import silhouette_score, rand_score, homogeneity_score, \
 from sklearn.mixture import GaussianMixture
 
 from utils.outputs import clusterer_joblib, clustering_score_png, \
-    clustering_visualization_png, clustering_evaluation_json, windows
+    clustering_visualization_png, clustering_evaluation_json, windows, \
+    clustering_visualization_reduced_space_png
 from utils.plots import simple_line_plot
 
 ClusteringAlg = Union[KMeans, GaussianMixture]
-ClusteringVisualizationFunc = Callable[[np.ndarray, np.ndarray, List[str]],
-                                       go.Figure]
 
 # A visualization function arguments are:
 #   1. x_data: Features of shape (N, n_features)
@@ -26,24 +25,34 @@ ClusteringVisualizationFunc = Callable[[np.ndarray, np.ndarray, List[str]],
 #   3. categories: An ordered list of category names of length n_categories
 #
 # It returns a go.Figure containing the visualization of the data.
-VisualizationFunction = Callable[[np.ndarray, np.ndarray, List[str]], go.Figure]
+ClusteringVisualizationFunc = Callable[[np.ndarray, np.ndarray, List[str]],
+                                       go.Figure]
+
+ReducedClusteringVisualizationFunc = Callable[
+    [np.ndarray, np.ndarray, List[str]], Tuple[go.Figure, go.Figure]]
 
 
 def run_clustering(dataset_name: str,
                    x_data: np.ndarray,
                    y_data: np.ndarray,
-                   visualization_fn: ClusteringVisualizationFunc,
-                   n_jobs: int = 1):
+                   visualization_fn: Union[ClusteringVisualizationFunc,
+                                           ReducedClusteringVisualizationFunc],
+                   n_jobs: int = 1,
+                   is_reduced=False):
     clustering_algs = [KMeans, GaussianMixture]
 
     # TODO: Gaussian Mixture other than "full"
-    # TODO: Clustering evaluation
 
     for alg in clustering_algs:
         logging.info(f'run_clustering() - {dataset_name} - {alg.__name__}')
         clusterer = _get_clusterer(alg, dataset_name, x_data, n_jobs, sync=True)
-        _sync_clustering_visualization(dataset_name, x_data, clusterer,
-                                       visualization_fn)
+
+        if not is_reduced:
+            _sync_clustering_visualization(dataset_name, x_data, clusterer,
+                                           visualization_fn)
+        else:
+            _sync_reduced_clustering_visualization(dataset_name, x_data,
+                                                   clusterer, visualization_fn)
         _sync_cluster_evaluation(dataset_name, x_data, y_data, clusterer)
 
 
@@ -85,7 +94,8 @@ def _get_clusterer(alg: Type, dataset_name: str, x_train: np.ndarray,
 
     if (not sync) and (not files_exist):
         raise FileNotFoundError(
-            f'{clusterer_joblib_path} or {clustering_score_plot_path} does not exist')
+            f'{clusterer_joblib_path} or {clustering_score_plot_path} does not exist'
+        )
 
     if files_exist:
         best_clusterer = joblib.load(clusterer_joblib_path)
@@ -178,9 +188,9 @@ def _cluster_data(alg, n_clusters, x_train):
     return clusterer, score
 
 
-def _sync_clustering_visualization(dataset_name: str, x_train: np.ndarray,
-                                   clusterer: ClusteringAlg,
-                                   visualization_fn: VisualizationFunction):
+def _sync_clustering_visualization(
+        dataset_name: str, x_train: np.ndarray, clusterer: ClusteringAlg,
+        visualization_fn: ClusteringVisualizationFunc):
     """Synchronizes clustering visualization
 
     If it does not exist, a new figure will be created.
@@ -211,6 +221,27 @@ def _sync_clustering_visualization(dataset_name: str, x_train: np.ndarray,
             fig.show()
 
 
+def _sync_reduced_clustering_visualization(
+        dataset_name: str, x_train: np.ndarray, clusterer: ClusteringAlg,
+        visualization_fn: ReducedClusteringVisualizationFunc):
+    alg_name = clusterer.__class__.__name__
+    png_path1 = clustering_visualization_png(dataset_name, alg_name)
+    png_path2 = clustering_visualization_reduced_space_png(
+        dataset_name, alg_name)
+
+    if not (os.path.exists(png_path1) and os.path.exists(png_path2)):
+        pred_labels = clusterer.predict(x_train)
+        all_labels = sorted(set(pred_labels))
+        categories = [f'cluster_{c}' for c in all_labels]
+        fig1, fig2 = visualization_fn(x_train, pred_labels, categories)
+        fig1.write_image(png_path1)
+        fig2.write_image(png_path2)
+
+        if windows:
+            fig1.show()
+            fig2.show()
+
+
 def _sync_cluster_evaluation(dataset_name: str, x_data: np.ndarray,
                              y_data: np.ndarray, clusterer: ClusteringAlg):
 
@@ -224,10 +255,12 @@ def _sync_cluster_evaluation(dataset_name: str, x_data: np.ndarray,
         completeness = completeness_score(y_data, y_pred)
         v_measure = v_measure_score(y_data, y_pred)
 
-        d = {'random_index': random_index,
-             'homogeneity': homogeneity,
-             'completeness': completeness,
-             'v_measure': v_measure}
+        d = {
+            'random_index': random_index,
+            'homogeneity': homogeneity,
+            'completeness': completeness,
+            'v_measure': v_measure
+        }
 
         with open(json_path, 'w') as fs:
             json.dump(d, fs, indent=4)
