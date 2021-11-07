@@ -41,8 +41,6 @@ def run_clustering(dataset_name: str,
                    is_reduced=False):
     clustering_algs = [KMeans, GaussianMixture]
 
-    # TODO: Gaussian Mixture other than "full"
-
     for alg in clustering_algs:
         logging.info(f'run_clustering() - {dataset_name} - {alg.__name__}')
         clusterer = _get_clusterer(alg, dataset_name, x_data, n_jobs, sync=True)

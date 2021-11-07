@@ -15,7 +15,7 @@ from tasks.dims_reduction import reduce_pca, reduce_ica, reduce_rp, reduce_dt, \
 from utils.grid_search import grid_search_nn
 from utils.nnestimator import NeuralNetworkEstimator, training_curves, one_hot
 from utils.outputs import reduction_clustering_nn_joblib, training_curve, \
-    grid_search_json
+    grid_search_json, results_test_data_json
 
 HIDDEN_LAYERS = [16] * 4
 
@@ -67,21 +67,31 @@ class ReductionClusteringNN:
         param_grid = {
             'in_features': [in_features],  # Constant
             'num_classes': [num_classes],  # Constant
-            'nn_size': [2, 4, 8],
+            'nn_size': [4],
             'learning_rate': [1e-6, 5e-6, 1e-5],
             'batch_size': [min(len(x_train), 128)],
-            'epochs': [3000],
+            'epochs': [2000],
             'verbose': [True]
         }
 
         gs = grid_search_nn(param_grid, x_train_red, y_train, x_val_red, y_val)
 
         self.nn = gs.best_model
+
+        # Find when validation accuracy reaches 0.6
+        val_accuracy_log = np.array(gs.best_model.training_log['val_accuracy'])
+        good_indices = np.arange(len(val_accuracy_log))[val_accuracy_log > 0.6]
+        if len(good_indices) > 0:
+            surpass_threshold_index = int(np.min(good_indices))
+        else:
+            surpass_threshold_index = -1
+
         self.grid_search_table = {
             'best_accuracy': gs.best_accuracy,
             'best_kwargs': gs.best_kwargs,
             'table': gs.table,
-            'best_fit_time': gs.best_fit_time
+            'best_fit_time': gs.best_fit_time,
+            'epochs_to_surpass_threshold': surpass_threshold_index
         }
 
     def predict(self, X: np.ndarray):
@@ -134,14 +144,11 @@ class ReductionClusteringNN:
         return x_concat
 
 
-def run_baseline_nn(dataset_name: str,
-                    x_train: np.ndarray,
-                    y_train: np.ndarray,
-                    x_val: np.ndarray,
-                    y_val: np.ndarray,
+def run_baseline_nn(dataset_name: str, x_train: np.ndarray, y_train: np.ndarray,
+                    x_val: np.ndarray, y_val: np.ndarray, x_test, y_test,
                     n_jobs=1):
     _sync_reduction_clustering_nn(dataset_name, x_train, y_train, x_val, y_val,
-                                  None, None)
+                                  x_test, y_test, None, None)
 
 
 def run_reduction_and_nn(dataset_name: str,
@@ -149,6 +156,8 @@ def run_reduction_and_nn(dataset_name: str,
                          y_train: np.ndarray,
                          x_val: np.ndarray,
                          y_val: np.ndarray,
+                         x_test,
+                         y_test,
                          n_jobs=1):
     """Applies dimensionality reduction and trains NN
 
@@ -178,7 +187,8 @@ def run_reduction_and_nn(dataset_name: str,
                                                        y_train, sync, n_jobs,
                                                        None)
         _sync_reduction_clustering_nn(dataset_name, x_train, y_train, x_val,
-                                      y_val, reduction_alg, None)
+                                      y_val, x_test, y_test, reduction_alg,
+                                      None)
 
 
 def _sync_reduction_clustering_nn(dataset_name: str,
@@ -186,6 +196,8 @@ def _sync_reduction_clustering_nn(dataset_name: str,
                                   y_train: np.ndarray,
                                   x_val: np.ndarray,
                                   y_val: np.ndarray,
+                                  x_test: np.ndarray,
+                                  y_test: np.ndarray,
                                   reduction_alg: Optional,
                                   clustering_alg: Optional,
                                   add_to_reduced_features: bool = False):
@@ -196,6 +208,8 @@ def _sync_reduction_clustering_nn(dataset_name: str,
       - The corresponding training curve i.e. acc vs iter
 
     Args:
+        y_test:
+        x_test:
         dataset_name: Dataset name
         x_train: Training features of shape
             `(n_train, n_features)`
@@ -203,6 +217,9 @@ def _sync_reduction_clustering_nn(dataset_name: str,
         x_val: Validation features of shape
             `(n_val, n_features)`
         y_val: Validation labels of shape `(n_val, )`
+        x_test: Test features of shape
+            `(n_test, n_features)`
+        y_test: Test labels of shape `(n_test, n_features)`
         reduction_alg: An optional reduction algorithm
             object that implements `.transform()` method.
         clustering_alg: An optional clustering algorithm
@@ -249,9 +266,18 @@ def _sync_reduction_clustering_nn(dataset_name: str,
         with open(gs_json_path, 'w') as fs:
             json.dump(red_nn.grid_search_table, fs, indent=4)
 
-    red_nn = joblib.load(joblib_path)
+    red_nn: ReductionClusteringNN = joblib.load(joblib_path)
     train_acc = accuracy_score(y_train, red_nn.predict(x_train))
     val_acc = accuracy_score(y_val, red_nn.predict(x_val))
+
+    test_json_path = results_test_data_json(dataset_name, reduction_alg_name,
+                                            clustering_alg_name)
+    if not os.path.exists(test_json_path):
+        y_pred = red_nn.predict(x_test)
+        acc = accuracy_score(y_test, y_pred)
+        d = {'test_accuracy': acc}
+        with open(test_json_path, 'w') as fs:
+            json.dump(d, fs)
 
     print(f'{reduction_alg_name} {clustering_alg_name} train_acc {train_acc}, '
           f'val_acc {val_acc}')
@@ -259,12 +285,9 @@ def _sync_reduction_clustering_nn(dataset_name: str,
     return red_nn
 
 
-def run_reduction_clustering_nn(dataset_name: str,
-                                x_train: np.ndarray,
-                                y_train: np.ndarray,
-                                x_val: np.ndarray,
-                                y_val: np.ndarray,
-                                n_jobs=1):
+def run_reduction_clustering_nn(dataset_name: str, x_train: np.ndarray,
+                                y_train: np.ndarray, x_val: np.ndarray,
+                                y_val: np.ndarray, x_test, y_test, n_jobs=1):
     logging.info(f'run_reduction_clustering_nn() - {dataset_name}')
 
     # Assume all dimensionality reduction algorithms have been run
@@ -290,6 +313,6 @@ def run_reduction_clustering_nn(dataset_name: str,
                     dataset_name_ += '_add_to_reduced_features'
 
                 _sync_reduction_clustering_nn(dataset_name_, x_train, y_train,
-                                              x_val, y_val, reduction_alg,
-                                              clustering_alg,
+                                              x_val, y_val, x_test, y_test,
+                                              reduction_alg, clustering_alg,
                                               add_to_reduced_features)

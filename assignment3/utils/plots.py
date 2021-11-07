@@ -431,6 +431,9 @@ def visualize_fashionmnist_vectors(vectors: np.ndarray, x_data: np.ndarray,
         raise ValueError('Wrong number of features. Expecting '
                          f'{expected_n_dims}, but got {n_dims}')
 
+    # Just pick at most 64 vectors
+    vectors = vectors[:64]
+
     # Rescale all vectors to 0-255
     min_vectors = np.min(vectors, axis=1)
     max_vectors = np.max(vectors, axis=1)

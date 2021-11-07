@@ -95,3 +95,9 @@ def grid_search_json(dataset_name: str, reduction_alg_name: Optional[str],
                      clustering_alg_name: Optional[str]):
     return f'{OUTPUT_DIRECTORY}/{dataset_name}_{reduction_alg_name}_' \
            f'{clustering_alg_name}_grid_search.json'
+
+
+def results_test_data_json(dataset_name: str, reduction_alg_name: Optional[str],
+                           clustering_alg_name: Optional[str]):
+    return f'{OUTPUT_DIRECTORY}/{dataset_name}_{reduction_alg_name}_' \
+           f'{clustering_alg_name}_test_set_results.json'

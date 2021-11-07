@@ -86,14 +86,16 @@ def dataset2(n_jobs: int):
 
     # Task 4
 
-    run_reduction_and_nn(dataset_name, x_train, y_train, x_val, y_val, n_jobs)
+    run_reduction_and_nn(dataset_name, x_train, y_train, x_val, y_val, x_test,
+                         y_test, n_jobs)
 
     # Task 5
     run_reduction_clustering_nn(dataset_name, x_train, y_train, x_val, y_val,
-                                n_jobs)
+                                x_test, y_test, n_jobs)
 
     # Baseline NN without reduction or clustering
-    run_baseline_nn(dataset_name, x_train, y_train, x_val, y_val, n_jobs)
+    run_baseline_nn(dataset_name, x_train, y_train, x_val, y_val, x_test,
+                    y_test, n_jobs)
 
 
 def main():

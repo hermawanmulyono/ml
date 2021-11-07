@@ -72,8 +72,6 @@ def reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
 
     """
 
-    # TODO: Plot PCA variance distribution
-
     logging.info(f'PCA - {dataset_name}')
 
     check_input(x_data)
@@ -83,11 +81,10 @@ def reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
     joblib_path = reduction_alg_joblib(dataset_name, alg_name)
     rec_error_path = reconstruction_error_png(dataset_name, alg_name)
     json_path = reduction_json(dataset_name, alg_name)
-    vector_viz_path = vector_visualization_png(dataset_name, alg_name)
 
     files_exist = all([
         os.path.exists(p)
-        for p in [joblib_path, rec_error_path, json_path, vector_viz_path]
+        for p in [joblib_path, rec_error_path, json_path]
     ])
 
     if (not sync) and (not files_exist):
@@ -118,20 +115,12 @@ def reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
 
         joblib.dump(pca, joblib_path)
 
-        # Store the projection vector visualization
-        fig = vector_visualization_fn(pca.components_, x_data, y_data)
-        fig.write_image(vector_viz_path)
-
-        if windows:
-            fig.show()
-
         # Save reconstruction error plot
         fig = simple_line_plot(n_dims_list, errors, 'n_components',
                                'reconstruction_error')
         fig.write_image(rec_error_path)
 
         # Save raw data as JSON
-        # This can be moved down there
         explained_variance = pcas[-1].explained_variance_.tolist()
         d = {
             'n_components': int(pca.n_components_),
@@ -144,6 +133,15 @@ def reduce_pca(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
 
     dim_red_alg: PCA = joblib.load(joblib_path)
     x_reduced = dim_red_alg.transform(x_data)
+
+    # Store the projection vector visualization
+    vector_viz_path = vector_visualization_png(dataset_name, alg_name)
+    if not os.path.exists(vector_viz_path):
+        fig = vector_visualization_fn(dim_red_alg.components_, x_data, y_data)
+        fig.write_image(vector_viz_path)
+
+        if windows:
+            fig.show()
 
     return x_reduced, dim_red_alg
 
@@ -191,11 +189,10 @@ def reduce_ica(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
     joblib_path = reduction_alg_joblib(dataset_name, alg_name)
     kurtosis_path = kurtosis_png(dataset_name, alg_name)
     json_path = reduction_json(dataset_name, alg_name)
-    vector_viz_path = vector_visualization_png(dataset_name, alg_name)
 
     files_exist = all([
         os.path.exists(p)
-        for p in [joblib_path, kurtosis_path, json_path, vector_viz_path]
+        for p in [joblib_path, kurtosis_path, json_path]
     ])
 
     if (not sync) and (not files_exist):
@@ -208,7 +205,7 @@ def reduce_ica(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
         # Run ICA
         n_features = x_data.shape[1]
 
-        steps = int(np.ceil(n_features / 32))
+        steps = int(np.ceil(n_features / 16))
         n_dims_list = list(range(1, n_features + 1, steps))
 
         def args_generator():
@@ -243,15 +240,17 @@ def reduce_ica(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
         with open(json_path, 'w') as fstream:
             json.dump(d, fstream, indent=4)
 
-        # Visualize the independent components
+    x_reduced = ica.transform(x_data)
+    vector_viz_path = vector_visualization_png(dataset_name, alg_name)
+
+    # Visualize the independent components
+    if not os.path.exists(vector_viz_path):
         mixing_vectors = ica.mixing_.T
         fig = vector_visualization_fn(mixing_vectors, x_data, y_data)
         fig.write_image(vector_viz_path)
 
         if windows:
             fig.show()
-
-    x_reduced = ica.transform(x_data)
 
     return x_reduced, ica
 
@@ -271,7 +270,7 @@ def _fit_ica(x_data: np.ndarray, n_dims: int):
     """
     print(f'Running ICA {n_dims} dimensions')
 
-    ica = FastICA(n_dims, max_iter=1000)
+    ica = FastICA(n_dims, max_iter=3000)
     ica.fit(x_data)
 
     # Find kurtosis of the source vectors
@@ -299,11 +298,10 @@ def reduce_rp(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
     joblib_path = reduction_alg_joblib(dataset_name, alg_name)
     rec_error_path = reconstruction_error_png(dataset_name, alg_name)
     json_path = reduction_json(dataset_name, alg_name)
-    vector_viz_path = vector_visualization_png(dataset_name, alg_name)
 
     files_exist = all([
         os.path.exists(p)
-        for p in [joblib_path, rec_error_path, json_path, vector_viz_path]
+        for p in [joblib_path, rec_error_path, json_path]
     ])
 
     if (not sync) and (not files_exist):
@@ -315,8 +313,6 @@ def reduce_rp(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
         n_features = x_data.shape[1]
 
         n_dims_list = list(range(1, n_features + 1))
-
-        # TODO: Run GaussianRP many times
 
         def args_generator():
             repeats = 10
@@ -344,10 +340,6 @@ def reduce_rp(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
         # Store the bet GaussianRP
         joblib.dump(best_rp, joblib_path)
 
-        # Store the projection vector visualization
-        fig = vector_visualization_fn(best_rp.components_, x_data, y_data)
-        fig.write_image(vector_viz_path)
-
         # Save reconstruction error plot
         fig = simple_line_plot(n_dims_list, all_errors_np.mean(axis=1),
                                'n_components', 'reconstruction_error',
@@ -365,6 +357,12 @@ def reduce_rp(dataset_name: str, x_data: np.ndarray, y_data: np.ndarray,
 
     dim_red_alg: GaussianRP = joblib.load(joblib_path)
     x_reduced = dim_red_alg.transform(x_data)
+
+    # Store the projection vector visualization
+    vector_viz_path = vector_visualization_png(dataset_name, alg_name)
+    if not os.path.exists(vector_viz_path):
+        fig = vector_visualization_fn(dim_red_alg.components_, x_data, y_data)
+        fig.write_image(vector_viz_path)
 
     return x_reduced, dim_red_alg
 
