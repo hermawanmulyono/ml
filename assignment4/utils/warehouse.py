@@ -70,25 +70,51 @@ class Warehouse:
         return point
 
     def to_int(self):
+        if self.is_terminal:
+            return self.terminal_state_int
+
         base = self.n_rows * self.n_cols
         max_power = self.n_packages + 1
 
-        if self.is_terminal:
-            # Most significant digit
-            msd = len(directions)
-
-            return msd * (base**max_power)
-
         robot_dir_ = directions_to_int[self.robot_dir]
+
+        # Convert all coordinates to integers
         robot_loc_ = self._loc_to_int(self.robot_loc)
         package_locations_ = [
             self._loc_to_int(loc) for loc in self.package_locations
         ]
 
+        # Collapse all coefficients to a single unique number
         coefficients = [robot_dir_] + [robot_loc_] + package_locations_
         powers = [max_power - i for i in range(len(coefficients))]
         assert powers[-1] == 0
+
         return sum([c * (base**p) for c, p in zip(coefficients, powers)])
+
+    def from_int(self, int_state: int):
+        if not (0 <= int_state <= self.terminal_state_int):
+            raise ValueError
+
+        if int_state == self.terminal_state_int:
+            return self.terminal_state_int
+
+        base = self.n_rows * self.n_cols
+
+
+
+        # Unpack
+
+    @property
+    def terminal_state_int(self) -> int:
+        base = self.n_rows * self.n_cols
+        max_power = self.n_packages + 1
+
+        # Most significant digit
+        msd = len(directions)
+
+        return msd * (base ** max_power)
+
+
 
     @property
     def is_terminal(self):

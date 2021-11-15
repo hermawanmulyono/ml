@@ -158,7 +158,6 @@ def _task_template(problem_name: str, alg_name: str,
     if not os.path.exists(json_table_path):
         score_table = [(kwargs, {
             'score': eval_mdp(mdp),
-            'iterations': mdp.iter,
             'time': mdp.time,
             'policy': mdp.policy
         }) for kwargs, mdp in joblib_table]
