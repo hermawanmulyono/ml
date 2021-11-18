@@ -19,3 +19,7 @@ def table_joblib(problem: str, alg_name: str):
 
 def table_score(problem: str, alg_name: str):
     return f'{OUTPUT_DIRECTORY}/{problem}_{alg_name}_grid_table.json'
+
+
+def frozen_lake_map(size: int, p: float):
+    return f'{OUTPUT_DIRECTORY}/map_{size}_p_{p}_cols.joblib'
