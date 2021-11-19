@@ -97,6 +97,8 @@ def task_policy_iteration():
         'max_iter': [10000]
     }
 
+    group_problems_by = ['size', 'p']
+
     def single_policy_iteration(size, p, discount, max_iter):
         env = get_frozen_lake(size, p)
         P, R = get_pr_matrices(env)
@@ -108,7 +110,7 @@ def task_policy_iteration():
         return eval_mdp(mdp, size, p)
 
     task_template(problem_name, alg_name, param_grid, single_policy_iteration,
-                  eval_fn)
+                  eval_fn, group_problems_by)
 
 
 def task_value_iteration():
@@ -122,6 +124,8 @@ def task_value_iteration():
         'max_iter': [10000]
     }
 
+    group_problems_by = ['size', 'p']
+
     def single_value_iteration(size, p, discount, max_iter):
         env = get_frozen_lake(size, p)
         P, R = get_pr_matrices(env)
@@ -133,11 +137,11 @@ def task_value_iteration():
         return eval_mdp(mdp, size, p)
 
     task_template(problem_name, alg_name, param_grid, single_value_iteration,
-                  eval_fn)
+                  eval_fn, group_problems_by)
 
 
 def task_q_learning():
-    problem_name = 'forest'
+    problem_name = 'frozenlake'
     alg_name = 'q_learning'
 
     param_grid = {
@@ -147,6 +151,8 @@ def task_q_learning():
         'n_iter': [10000]
     }
 
+    group_problems_by = ['size', 'p']
+
     def single_value_iteration(size, p, discount, n_iter):
         env = get_frozen_lake(size, p)
         P, R = get_pr_matrices(env)
@@ -154,35 +160,8 @@ def task_q_learning():
         vi.run()
         return vi
 
+    def eval_fn(mdp, size, p, **kwargs):
+        return eval_mdp(mdp, size, p)
+
     task_template(problem_name, alg_name, param_grid, single_value_iteration,
-                  eval_mdp)
-
-
-if __name__ == '__main__':
-    pass
-    # param_grid = {'discount': [0.9, 0.99], 'max_iter': [10000]}
-
-    # def single_run(discount, max_iter):
-    #     env = gym.make('FrozenLake-v1')
-    #     P, R = get_pr_matrices(env)
-    #     vi = ValueIteration(P, R, discount=discount, max_iter=max_iter)
-    #     vi.run()
-    #     return vi
-    #
-    # joblib_table, score_table = task_template('frozen-lake', 'value_iteration',
-    #                                           param_grid, single_run)
-    # vi = joblib_table[0][1]
-    #
-    # env_: TimeLimit = gym.make('FrozenLake-v1')
-    # state = env_.reset()
-    # policy = vi.policy
-    #
-    # while True:
-    #     action = policy[state]
-    #     observation, reward, done, info = env_.step(action)
-    #     env_.render()
-    #
-    #     if done:
-    #         break
-    #
-    #     state = observation
+                  eval_fn, group_problems_by)

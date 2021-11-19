@@ -2,7 +2,7 @@ import copy
 import json
 import logging
 import os
-from typing import List, Dict, Iterable, Callable, Tuple
+from typing import List, Dict, Iterable, Callable, Tuple, Any
 
 import joblib
 from mdptoolbox.mdp import MDP
@@ -67,7 +67,9 @@ def task_template(problem_name: str,
                   alg_name: str,
                   param_grid: Dict[str, Iterable],
                   single_run_fn: Callable,
-                  eval_mdp: Callable[..., float]):
+                  eval_mdp: Callable[..., float],
+                  group_problems_by: List[str]):
+
     joblib_table_path = table_joblib(problem_name, alg_name)
 
     if not os.path.exists(joblib_table_path):
@@ -84,21 +86,51 @@ def task_template(problem_name: str,
 
     joblib_table = joblib.load(joblib_table_path)
 
+    # all_json_tables has the following structure
+    # {..., 'problem_name_string': [(kwargs, metrics)] ,...}
+    all_json_tables: Dict[str, list] = {}
+
+    for kwargs, mdp in joblib_table:
+        # Construct problem name 'problem_name_param1_val1_param2_val2'
+        params_to_append = [(param_name, kwargs[param_name]) for param_name
+                            in group_problems_by]
+        problem_name_with_params = append_problem_name(problem_name, params_to_append)
+
+        if problem_name_with_params not in all_json_tables:
+            all_json_tables[problem_name_with_params] = []
+
+        all_json_tables[problem_name_with_params].append((kwargs, mdp))
+
     json_table_path = table_score(problem_name, alg_name)
 
     if not os.path.exists(json_table_path):
-        score_table = [(kwargs, {
-            'score': eval_mdp(mdp, **kwargs),
-            'time': mdp.time,
-            'policy': mdp.policy
-        }) for kwargs, mdp in joblib_table]
+        all_score_tables = {}
+        for problem_name_with_params, table in all_json_tables.items():
+            score_table = [(kwargs, {
+                'score': eval_mdp(mdp, **kwargs),
+                'time': mdp.time,
+                'policy': mdp.policy,
+                'iter': mdp.iter if hasattr(mdp, 'iter') else mdp.max_iter
+            }) for kwargs, mdp in table]
 
-        score_table.sort(key=lambda x: x[1]['score'], reverse=True)
+            score_table.sort(key=lambda x: x[1]['score'], reverse=True)
+
+            all_score_tables[problem_name_with_params] = score_table
 
         with open(json_table_path, 'w') as fs:
-            json.dump(score_table, fs, indent=4)
+            json.dump(all_score_tables, fs, indent=4)
 
     with open(json_table_path, 'r') as fs:
-        score_table = json.load(fs)
+        all_score_tables: Dict[str, list] = json.load(fs)
 
-    return joblib_table, score_table
+    return joblib_table, all_score_tables
+
+
+def append_problem_name(problem_name: str, params: List[Tuple[str, Any]]):
+    problem_name_with_params = problem_name
+    for param_name, val in params:
+        problem_name_with_params += f'_{param_name}_{val}'
+    return problem_name_with_params
+
+
+
