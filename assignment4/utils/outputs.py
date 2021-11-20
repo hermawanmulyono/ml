@@ -23,3 +23,8 @@ def table_score(problem: str, alg_name: str):
 
 def frozen_lake_map(size: int, p: float):
     return f'{OUTPUT_DIRECTORY}/map_{size}_p_{p}_cols.joblib'
+
+
+def frozen_lake_policy_path(problem_name_with_params: str):
+    return f'{OUTPUT_DIRECTORY}/{problem_name_with_params}.png'
+
