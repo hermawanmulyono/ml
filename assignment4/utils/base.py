@@ -83,9 +83,9 @@ def task_template(problem_name: str,
             pi = single_run_fn(**kwargs)
             joblib_table.append((kwargs, pi))
 
-            # from utils.frozenlake import plot_policy
-            # plot_policy(pi.policy, kwargs['size'], kwargs['p'], 'eval.png')
-            # plt.show()
+            from utils.frozenlake import plot_policy
+            plot_policy(pi.policy, kwargs['size'], kwargs['p'], 'eval.png')
+            plt.show()
 
         joblib.dump(joblib_table, joblib_table_path)
 

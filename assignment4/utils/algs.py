@@ -14,6 +14,7 @@ def default_learning_rate_schedule(n):
 
 
 class ConstantFunction:
+    """Pickleable and callable constant function"""
 
     def __init__(self, value):
         self.value = value

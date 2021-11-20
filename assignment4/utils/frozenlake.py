@@ -100,7 +100,7 @@ def eval_mdp(mdp: MDP, size: int, p: float, is_slippery: bool, repeats=1000):
     for _ in range(repeats):
         state = env.reset()
         step = 0
-        max_steps = 1000
+        max_steps = 5000
         while step < max_steps:
             action = policy[state]
             step += 1
@@ -290,11 +290,11 @@ def task_q_learning():
     alg_name = 'q_learning'
 
     param_grid = {
-        'size': [4, 6, 8],
+        'size': [8, 6, 4],
         'p': [0.9, 0.7, 0.5],
-        'is_slippery': [False, True],
+        'is_slippery': [True],
         'discount': [0.9, 0.99, 0.999],
-        'n_iter': [300000]  # or 300000 if using small states <= 8
+        'n_iter': [50000000]  # or 300000 if using small states <= 8
     }
 
     group_problems_by = ['size', 'p', 'is_slippery']
