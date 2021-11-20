@@ -5,6 +5,7 @@ import os
 from typing import List, Dict, Iterable, Callable, Tuple, Any
 
 import joblib
+from matplotlib import pyplot as plt
 from mdptoolbox.mdp import MDP
 
 from utils.outputs import table_joblib, table_score
@@ -81,6 +82,10 @@ def task_template(problem_name: str,
             logging.info(f'{problem_name} {alg_name} {kwargs}')
             pi = single_run_fn(**kwargs)
             joblib_table.append((kwargs, pi))
+
+            # from utils.frozenlake import plot_policy
+            # plot_policy(pi.policy, kwargs['size'], kwargs['p'], 'eval.png')
+            # plt.show()
 
         joblib.dump(joblib_table, joblib_table_path)
 

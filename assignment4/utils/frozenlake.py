@@ -1,3 +1,4 @@
+import math
 import os
 
 import gym
@@ -5,11 +6,12 @@ import joblib
 import numpy as np
 from gym.envs.toy_text.frozen_lake import generate_random_map
 from gym.wrappers import TimeLimit
-from mdptoolbox.mdp import ValueIteration, PolicyIteration, MDP, QLearning
+from mdptoolbox.mdp import ValueIteration, PolicyIteration, MDP
 import matplotlib.pyplot as plt
 
 from utils.base import task_template, append_problem_name
 from utils.outputs import frozen_lake_map, frozen_lake_policy_path
+from utils.algs import QLearning
 
 
 def run_all():
@@ -98,7 +100,7 @@ def eval_mdp(mdp: MDP, size: int, p: float, is_slippery: bool, repeats=1000):
     for _ in range(repeats):
         state = env.reset()
         step = 0
-        max_steps = 100
+        max_steps = 1000
         while step < max_steps:
             action = policy[state]
             step += 1
@@ -137,7 +139,7 @@ def get_param_grid():
         'p': [0.9, 0.7, 0.5],
         'is_slippery': [True, False],
         'discount': [0.9, 0.99, 0.999],
-        'max_iter': [10000]
+        'max_iter': [100000]
     }
 
 
@@ -229,7 +231,8 @@ def task_policy_iteration():
         discount = 0.9
         max_iter = param_grid['max_iter'][0]
 
-        params_to_append = [('size', size), ('p', p), ('is_slippery', is_slippery)]
+        params_to_append = [('size', size), ('p', p),
+                            ('is_slippery', is_slippery)]
         problem_name_with_params = append_problem_name(problem_name,
                                                        params_to_append)
         table = all_scores_tables[problem_name_with_params]
@@ -273,16 +276,25 @@ def task_value_iteration():
                   eval_fn, group_problems_by)
 
 
+def epsilon_schedule(n):
+    return 0.5
+
+
+def learning_rate_schedule(n):
+    lr = 1 / math.log(n + math.exp(0))
+    return max(lr, 1E-2)
+
+
 def task_q_learning():
     problem_name = 'frozenlake'
     alg_name = 'q_learning'
 
     param_grid = {
-        'size': [16, 18, 20],
+        'size': [4, 6, 8],
         'p': [0.9, 0.7, 0.5],
         'is_slippery': [False, True],
         'discount': [0.9, 0.99, 0.999],
-        'n_iter': [10000]
+        'n_iter': [300000]  # or 300000 if using small states <= 8
     }
 
     group_problems_by = ['size', 'p', 'is_slippery']
@@ -290,7 +302,13 @@ def task_q_learning():
     def single_value_iteration(size, p, is_slippery, discount, n_iter):
         env = get_frozen_lake(size, p, is_slippery)
         P, R = get_pr_matrices(env)
-        vi = QLearning(P, R, discount=discount, n_iter=n_iter)
+        vi = QLearning(P,
+                       R,
+                       discount=discount,
+                       n_iter=n_iter,
+                       restart_steps=100,
+                       learning_rate_schedule=learning_rate_schedule,
+                       epsilon_schedule=epsilon_schedule)
         vi.run()
         return vi
 
