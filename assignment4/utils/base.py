@@ -14,25 +14,29 @@ from utils.outputs import table_joblib, table_score
 class ParamGridGenerator:
 
     def __init__(self, param_grid):
-        self.param_grid = param_grid
+        if type(param_grid) == dict:
+            param_grid = [param_grid]
+        self.param_grids = param_grid
 
     def generator(self):
-        param_names: List[str] = list(self.param_grid.keys())
-        grid_index = [0] * len(param_names)
-        while True:
-            kwargs = {
-                key: self.param_grid[key][gi]
-                for gi, key in zip(grid_index, param_names)
-            }
+        for param_grid in self.param_grids:
+            param_names: List[str] = list(param_grid.keys())
+            grid_index = [0] * len(param_names)
+            while True:
+                kwargs = {
+                    key: param_grid[key][gi]
+                    for gi, key in zip(grid_index, param_names)
+                }
 
-            yield kwargs
+                yield kwargs
 
-            grid_index = self._increase_grid_index(grid_index)
+                grid_index = self._increase_grid_index(grid_index, param_grid)
 
-            if all([gi == 0 for gi in grid_index]):
-                break
+                if all([gi == 0 for gi in grid_index]):
+                    break
 
-    def _increase_grid_index(self, grid_index: List[int]):
+    @classmethod
+    def _increase_grid_index(cls, grid_index: List[int], param_grid):
         """Gets the next set of parameters for grid search
 
         Note:
@@ -43,12 +47,13 @@ class ParamGridGenerator:
             grid_index: Current grid index. Each element
                 indicates the corresponding element in
                 param_grid.
+            param_grid: parameter grid dictionary of interest
 
         Returns:
             The next grid_index.
 
         """
-        param_grid = self.param_grid
+        param_grid = param_grid
         param_names: List[str] = list(param_grid.keys())
 
         grid_index = copy.deepcopy(grid_index)
