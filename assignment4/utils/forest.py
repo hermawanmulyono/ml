@@ -1,9 +1,11 @@
+import math
 from typing import Dict
 
-from mdptoolbox.mdp import ValueIteration, PolicyIteration, QLearning, MDP
+from mdptoolbox.mdp import ValueIteration, PolicyIteration, MDP
 import mdptoolbox.example
 from scipy.stats import entropy
 
+from utils.algs import QLearning
 from utils.base import task_template, append_problem_name
 
 
@@ -174,24 +176,35 @@ def task_value_iteration():
     return all_scores_table
 
 
+def epsilon_schedule(n):
+    return max(1 / math.log(n + math.exp(0)), 0.5)
+
+
+def learning_rate_schedule(n):
+    lr = 1 / math.log(n + math.exp(0))
+    return max(lr, 1E-2)
+
+
 def task_q_learning():
     problem_name = 'forest'
     alg_name = 'q_learning'
 
     param_grid = {
-        'S': [5, 10, 100, 1000],
+        'S': [100, 5, 10, 1000],
         'r1': [1, 8, 16],
-        'r2': [1, 8, 16],
+        'r2': [8, 1, 16],
         'p': [0.1, 0.2, 0.3],
         'discount': [0.9, 0.99, 0.999],
-        'n_iter': [100000]
+        'n_iter': [10000000]
     }
 
     group_problems_by = ['S', 'r1', 'r2', 'p']
 
     def single_qlearning(S, r1, r2, p, discount, n_iter):
         P, R = mdptoolbox.example.forest(S, r1=r1, r2=r2, p=p)
-        vi = QLearning(P, R, discount=discount, n_iter=n_iter)
+        vi = QLearning(P, R, discount=discount, n_iter=n_iter,
+                       learning_rate_schedule=learning_rate_schedule,
+                       epsilon_schedule=epsilon_schedule)
         vi.run()
         return vi
 
