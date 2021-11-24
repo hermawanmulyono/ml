@@ -89,15 +89,15 @@ def task_template(problem_name: str,
             joblib_table.append((kwargs, pi))
 
             # For debugging frozen lake
-            # from utils.frozenlake import plot_policy
-            # plot_policy(pi.policy, kwargs['size'], kwargs['p'], 'eval.png')
-            # plt.show()
+            from utils.frozenlake import plot_policy
+            plot_policy(pi.policy, kwargs['size'], kwargs['p'], 'eval.png')
+            plt.show()
 
             # For debugging forest
-            plt.figure(figsize=(6, 2))
-            x = list(range(len(pi.policy)))
-            plt.plot(x, pi.policy)
-            plt.show()
+            # plt.figure(figsize=(6, 2))
+            # x = list(range(len(pi.policy)))
+            # plt.plot(x, pi.policy)
+            # plt.show()
 
         joblib.dump(joblib_table, joblib_table_path)
 
@@ -123,7 +123,11 @@ def task_template(problem_name: str,
     if not os.path.exists(json_table_path):
         all_score_tables = {}
         for problem_name_with_params, table in all_json_tables.items():
-            score_table = [(kwargs, {
+
+            def stringify(kwargs):
+                return {k: f'{v}' for k, v in kwargs.items()}
+
+            score_table = [(stringify(kwargs), {
                 'score': eval_mdp(mdp, **kwargs),
                 'time': mdp.time,
                 'policy': mdp.policy,

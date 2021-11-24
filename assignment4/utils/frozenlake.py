@@ -6,12 +6,12 @@ import joblib
 import numpy as np
 from gym.envs.toy_text.frozen_lake import generate_random_map
 from gym.wrappers import TimeLimit
-from mdptoolbox.mdp import ValueIteration, PolicyIteration, MDP
+from mdptoolbox.mdp import MDP
 import matplotlib.pyplot as plt
 
 from utils.base import task_template, append_problem_name
 from utils.outputs import frozen_lake_map, frozen_lake_policy_path
-from utils.algs import QLearning
+from utils.algs import PolicyIteration, ValueIteration, QLearning
 
 
 def run_all():
@@ -62,10 +62,12 @@ def plot_policy(policy, size, p, filename: str):
         for col in range(size):
             x0 = col + 0.5
             y0 = (size - (row + 0.5))
+
+            if desc[row, col] == b'S':
+                plt.text(x0, y0, 'S')
+
             if desc[row, col] == b'H':
                 plt.text(x0, y0, 'H')
-            elif desc[row, col] == b'S':
-                plt.text(x0, y0, 'S')
             elif desc[row, col] == b'G':
                 plt.text(x0, y0, 'G')
             else:
@@ -91,16 +93,19 @@ def get_frozen_lake(size: int, p: float, is_slippery: bool):
     return env
 
 
-def eval_mdp(mdp: MDP, size: int, p: float, is_slippery: bool, repeats=1000):
+def eval_mdp(mdp: MDP, size: int, p: float, is_slippery: bool, repeats=300):
+    return np.mean(mdp.V)
     env: TimeLimit = get_frozen_lake(size, p, is_slippery)
     policy = mdp.policy
 
     steps = []
 
-    for _ in range(repeats):
+    for r in range(repeats):
+        if r % 10 == 0:
+            print(f'Evaluating {r}')
         state = env.reset()
         step = 0
-        max_steps = 5000
+        max_steps = 1E10
         while step < max_steps:
             action = policy[state]
             step += 1
@@ -134,13 +139,21 @@ def get_map(size: int, p: float) -> np.ndarray:
 
 
 def get_param_grid():
-    return {
-        'size': [4, 6, 8],
-        'p': [0.9, 0.7, 0.5],
-        'is_slippery': [True, False],
+    return [{
+        'size': [8],
+        'p': [0.9],
+        'is_slippery': [True],
+        'epsilon': [0.1, 0.001, 0.0001],
         'discount': [0.9, 0.99, 0.999],
         'max_iter': [100000]
-    }
+    }, {
+        'size': [16],
+        'p': [0.9],
+        'is_slippery': [True],
+        'epsilon': [0.1, 0.001, 0.0001],
+        'discount': [0.9, 0.99, 0.999],
+        'max_iter': [100000]
+    }]
 
 
 def task_policy_iteration():
@@ -151,107 +164,92 @@ def task_policy_iteration():
 
     group_problems_by = ['size', 'p', 'is_slippery']
 
-    def single_policy_iteration(size, p, is_slippery, discount, max_iter):
+    def single_policy_iteration(size, p, is_slippery, epsilon, discount, \
+                                                             max_iter):
         env = get_frozen_lake(size, p, is_slippery)
         P, R = get_pr_matrices(env)
-        pi = PolicyIteration(P, R, discount=discount, max_iter=max_iter)
+        pi = PolicyIteration(P,
+                             R,
+                             epsilon=epsilon,
+                             discount=discount,
+                             max_iter=max_iter)
         pi.run()
         return pi
 
     def eval_fn(mdp, size, p, is_slippery, **kwargs):
         return eval_mdp(mdp, size, p, is_slippery)
 
-    _, all_scores_tables = task_template(problem_name, alg_name, param_grid,
-                                         single_policy_iteration, eval_fn,
-                                         group_problems_by)
+    joblib_table, all_scores_tables = task_template(problem_name, alg_name,
+                                                    param_grid,
+                                                    single_policy_iteration,
+                                                    eval_fn, group_problems_by)
 
-    print('Varying size')
-    for size in param_grid['size']:
-        p = 0.7
-        is_slippery = False
-        discount = 0.9
-        max_iter = param_grid['max_iter'][0]
+    import matplotlib.pyplot as plt
 
-        params_to_append = [('size', size), ('p', p),
-                            ('is_slippery', is_slippery)]
-        problem_name_with_params = append_problem_name(problem_name,
-                                                       params_to_append)
-        table = all_scores_tables[problem_name_with_params]
-        kwargs = {
-            'size': size,
-            'p': p,
-            'is_slippery': is_slippery,
-            'discount': discount,
-            'max_iter': max_iter
-        }
+    for grid in get_param_grid():
+        plt.figure()
 
-        fig_file_path = frozen_lake_policy_path(problem_name_with_params)
+        for epsilon in grid['epsilon'][::-1]:
+            size = grid['size'][0]
+            p = grid['p'][0]
+            is_slippery = grid['is_slippery'][0]
+            discount = 0.99
+            max_iter = grid['max_iter'][0]
 
-        # Linear search
-        for kwargs_, results in table:
-            if kwargs_ == kwargs:
-                print(results)
-                plot_policy(results['policy'], kwargs['size'], kwargs['p'],
-                            fig_file_path)
+            kwargs = {
+                'size': size,
+                'p': p,
+                'is_slippery': is_slippery,
+                'discount': discount,
+                'max_iter': max_iter,
+                'epsilon': epsilon
+            }
 
-    print('Varying p')
-    for p in param_grid['p']:
-        size = 8
-        is_slippery = False
-        discount = 0.9
+            pi: PolicyIteration
+            evaluations = None
+            for kwargs_, pi in joblib_table:
+                if kwargs_ == kwargs:
+                    evaluations = pi.evaluations
+                    break
 
-        max_iter = param_grid['max_iter'][0]
+            assert evaluations is not None
 
-        params_to_append = [('size', size), ('p', p),
-                            ('is_slippery', is_slippery)]
-        problem_name_with_params = append_problem_name(problem_name,
-                                                       params_to_append)
-        table = all_scores_tables[problem_name_with_params]
-        kwargs = {
-            'size': size,
-            'p': p,
-            'is_slippery': is_slippery,
-            'discount': discount,
-            'max_iter': max_iter
-        }
+            steps, vmean = zip(*evaluations)
+            print(evaluations)
+            plt.plot(steps, vmean, label=f'{epsilon}')
+        plt.legend()
 
-        fig_file_path = frozen_lake_policy_path(problem_name_with_params)
+        plt.figure()
+        for discount in grid['discount'][::-1]:
+            epsilon = 0.001
+            size = grid['size'][0]
+            p = grid['p'][0]
+            is_slippery = grid['is_slippery'][0]
+            max_iter = grid['max_iter'][0]
 
-        # Linear search
-        for kwargs_, results in table:
-            if kwargs_ == kwargs:
-                print(results)
-                plot_policy(results['policy'], kwargs['size'], kwargs['p'],
-                            fig_file_path)
+            kwargs = {
+                'size': size,
+                'p': p,
+                'is_slippery': is_slippery,
+                'discount': discount,
+                'max_iter': max_iter,
+                'epsilon': epsilon
+            }
 
-    print('Varying is_slippery')
-    for is_slippery in param_grid['is_slippery']:
-        size = 8
-        p = 0.7
-        discount = 0.9
-        max_iter = param_grid['max_iter'][0]
+            pi: PolicyIteration
+            evaluations = None
+            for kwargs_, pi in joblib_table:
+                if kwargs_ == kwargs:
+                    evaluations = pi.evaluations
+                    break
 
-        params_to_append = [('size', size), ('p', p),
-                            ('is_slippery', is_slippery)]
-        problem_name_with_params = append_problem_name(problem_name,
-                                                       params_to_append)
-        table = all_scores_tables[problem_name_with_params]
-        kwargs = {
-            'size': size,
-            'p': p,
-            'is_slippery': is_slippery,
-            'discount': discount,
-            'max_iter': max_iter
-        }
+            assert evaluations is not None
 
-        fig_file_path = frozen_lake_policy_path(problem_name_with_params)
-
-        # Linear search
-        for kwargs_, results in table:
-            if kwargs_ == kwargs:
-                print(results)
-                plot_policy(results['policy'], kwargs['size'], kwargs['p'],
-                            fig_file_path)
+            steps, vmean = zip(*evaluations)
+            print(evaluations)
+            plt.plot(steps, vmean, label=f'{discount}')
+        plt.legend()
+        plt.show()
 
 
 def task_value_iteration():
@@ -262,10 +260,15 @@ def task_value_iteration():
 
     group_problems_by = ['size', 'p', 'is_slippery']
 
-    def single_value_iteration(size, p, is_slippery, discount, max_iter):
+    def single_value_iteration(size, p, is_slippery, epsilon, discount, \
+                                                             max_iter):
         env = get_frozen_lake(size, p, is_slippery)
         P, R = get_pr_matrices(env)
-        vi = ValueIteration(P, R, discount=discount, max_iter=max_iter)
+        vi = ValueIteration(P,
+                            R,
+                            epsilon=epsilon,
+                            discount=discount,
+                            max_iter=max_iter)
         vi.run()
         return vi
 
@@ -277,29 +280,51 @@ def task_value_iteration():
 
 
 def epsilon_schedule(n):
-    return 0.5
+    e = max(0.1, 1 / (1 + n / 1E7))
+    if n % 10000 == 0:
+        print(f'e = {e}')
+    return e
 
 
 def learning_rate_schedule(n):
     lr = 1 / math.log(n + math.exp(0))
-    return max(lr, 1E-2)
+    return max(lr, 1E-3)
 
 
 def task_q_learning():
     problem_name = 'frozenlake'
     alg_name = 'q_learning'
 
-    param_grid = {
-        'size': [8, 6, 4],
-        'p': [0.9, 0.7, 0.5],
+    # param_grid = {
+    #     'size': [16, 4],
+    #     'p': [0.8],
+    #     'is_slippery': [True],
+    #     'discount': [0.9, 0.99, 0.999],
+    #     'n_iter': [3000000]  # or 300000 if using small states <= 8
+    # }
+
+    param_grid = [{
+        'size': [8],
+        'p': [0.9],
         'is_slippery': [True],
-        'discount': [0.9, 0.99, 0.999],
-        'n_iter': [50000000]  # or 300000 if using small states <= 8
-    }
+        'discount': [0.9],
+        'epsilon_schedule': [0.9, epsilon_schedule, None],
+        'learning_rate_schedule': [0.1, learning_rate_schedule, None],
+        'n_iter': [1000000]
+    }, {
+        'size': [16],
+        'p': [0.9],
+        'is_slippery': [True],
+        'discount': [0.9],
+        'epsilon_schedule': [0.9, epsilon_schedule, None],
+        'learning_rate_schedule': [0.1, learning_rate_schedule, None],
+        'n_iter': [1000000]
+    }][::-1]
 
     group_problems_by = ['size', 'p', 'is_slippery']
 
-    def single_value_iteration(size, p, is_slippery, discount, n_iter):
+    def single_value_iteration(size, p, is_slippery, epsilon_schedule,
+                               learning_rate_schedule, discount, n_iter):
         env = get_frozen_lake(size, p, is_slippery)
         P, R = get_pr_matrices(env)
         vi = QLearning(P,
