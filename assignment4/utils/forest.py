@@ -261,7 +261,7 @@ def generate_convergence_plots(joblib_table, problem_name: str, alg_name: str):
             steps, vmean = zip(*evaluations)
             plt.plot(steps, vmean, label=f'{epsilon}')
         plt.legend()
-        plt.xlabel('epsilon')
+        plt.xlabel('iteration')
         plt.ylabel('V mean')
 
         problem_name_w_size = f'{problem_name}_{S}'
@@ -296,7 +296,7 @@ def generate_convergence_plots(joblib_table, problem_name: str, alg_name: str):
             plt.plot(steps, vmean, label=f'{discount}')
 
         plt.legend()
-        plt.xlabel('epsilon')
+        plt.xlabel('iteration')
         plt.ylabel('V mean')
         filename = convergence_plot(problem_name_w_size, alg_name, 'gamma')
         plt.savefig(filename)
@@ -349,8 +349,108 @@ def task_q_learning():
         vi.run()
         return vi
 
-    task_template(problem_name, alg_name, param_grid, single_qlearning,
-                  eval_mdp, group_problems_by)
+    joblib_table, _ = task_template(problem_name, alg_name, param_grid,
+                                    single_qlearning, eval_mdp,
+                                    group_problems_by)
+
+    for grid in param_grid:
+        S = grid['S'][0]
+        r1 = grid['r1'][0]
+        r2 = grid['r2'][0]
+        p = grid['p'][0]
+        n_iter = grid['n_iter'][0]
+
+        plt.figure()
+        for epsilon_schedule_ in grid['epsilon_schedule'][::-1]:
+            discount = 0.99
+            kwargs = {
+                'S': S,
+                'r1': r1,
+                'r2': r2,
+                'p': p,
+                'epsilon_schedule': epsilon_schedule_,
+                'learning_rate_schedule': None,
+                'discount': discount,
+                'n_iter': n_iter
+            }
+
+            ql: QLearning
+            evaluations = None
+            for kwargs_, ql in joblib_table:
+                if kwargs_ == kwargs:
+                    evaluations = ql.evaluations
+                    print(kwargs_)
+                    print_forest_policy(ql.policy)
+                    break
+
+            assert evaluations is not None
+
+            steps, vmean = zip(*evaluations)
+
+            if callable(epsilon_schedule_):
+                label = epsilon_schedule_.__name__
+            elif epsilon_schedule_ is None:
+                label = 'default'
+            else:
+                label = f'{epsilon_schedule_}'
+
+            plt.plot(steps, vmean, label=label)
+
+        plt.legend()
+        plt.xlabel('iteration')
+        plt.ylabel('V mean')
+
+        problem_name_w_size = f'{problem_name}_{S}'
+        filename = convergence_plot(problem_name_w_size, alg_name,
+                                    'epsilon_schedule')
+        plt.savefig(filename)
+
+        plt.close("all")
+        plt.figure()
+        for learning_rate_schedule_ in grid['learning_rate_schedule'][::-1]:
+            discount = 0.99
+            kwargs = {
+                'S': S,
+                'r1': r1,
+                'r2': r2,
+                'p': p,
+                'epsilon_schedule': None,
+                'learning_rate_schedule': learning_rate_schedule_,
+                'discount': discount,
+                'n_iter': n_iter
+            }
+
+            ql: QLearning
+            evaluations = None
+            for kwargs_, ql in joblib_table:
+                if kwargs_ == kwargs:
+                    evaluations = ql.evaluations
+                    print(kwargs_)
+                    print_forest_policy(ql.policy)
+                    break
+
+            assert evaluations is not None
+
+            steps, vmean = zip(*evaluations)
+
+            if callable(learning_rate_schedule_):
+                label = learning_rate_schedule_.__name__
+            elif learning_rate_schedule_ is None:
+                label = 'default'
+            else:
+                label = f'{learning_rate_schedule_}'
+
+            plt.plot(steps, vmean, label=label)
+
+        plt.legend()
+        plt.xlabel('iteration')
+        plt.ylabel('V mean')
+
+        problem_name_w_size = f'{problem_name}_{S}'
+        filename = convergence_plot(problem_name_w_size, alg_name,
+                                    'epsilon_schedule')
+        plt.savefig(filename)
+        plt.show()
 
 
 def eval_mdp(mdp: MDP, **kwargs):

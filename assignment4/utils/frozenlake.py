@@ -144,16 +144,16 @@ def get_param_grid():
         'size': [8],
         'p': [0.9],
         'is_slippery': [True],
-        'epsilon': [0.1, 0.001, 0.0001],
+        'epsilon': [0.1, 0.01, 0.001, 0.0001],
         'discount': [0.9, 0.99, 0.999],
-        'max_iter': [100000]
+        'max_iter': [1000]
     }, {
-        'size': [16],
+        'size': [24],
         'p': [0.9],
         'is_slippery': [True],
-        'epsilon': [0.1, 0.001, 0.0001],
+        'epsilon': [0.1, 0.01, 0.001, 0.0001],
         'discount': [0.9, 0.99, 0.999],
-        'max_iter': [100000]
+        'max_iter': [10000]
     }]
 
 
@@ -222,6 +222,8 @@ def generate_convergence_plots(joblib_table, problem_name: str, alg_name: str):
             print(evaluations)
             plt.plot(steps, vmean, label=f'{epsilon}')
         plt.legend()
+        plt.xlabel('iteration')
+        plt.ylabel('V mean')
 
         size = grid['size'][0]
         problem_name_w_size = f'{problem_name}_{size}'
@@ -258,6 +260,8 @@ def generate_convergence_plots(joblib_table, problem_name: str, alg_name: str):
             print(evaluations)
             plt.plot(steps, vmean, label=f'{discount}')
         plt.legend()
+        plt.xlabel('iteration')
+        plt.ylabel('V mean')
 
         filename = convergence_plot(problem_name_w_size, alg_name, 'gamma')
         plt.savefig(filename)
@@ -326,7 +330,7 @@ def task_q_learning():
         'learning_rate_schedule': [0.1, learning_rate_schedule, None],
         'n_iter': [1000000]
     }, {
-        'size': [16],
+        'size': [24],
         'p': [0.9],
         'is_slippery': [True],
         'discount': [0.9],

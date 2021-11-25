@@ -211,10 +211,12 @@ class PolicyIteration(MDPPolicyIteration):
             # of iterations has been reached then stop
 
             self.evaluations.append((self.iter, np.mean(self.V)))
-            print((self.iter, np.mean(self.V)))
+
+            if self.iter % 1000 == 0:
+                print((self.iter, np.mean(self.V)))
 
             # variation = _util.getSpan(self.V - Vprev)
-            variation = np.max(np.abs(self.V) - Vprev)
+            variation = np.max(np.abs(self.V - Vprev))
 
             # if n_different == 0:
             if variation < self.epsilon:
@@ -268,7 +270,7 @@ class ValueIteration(MDPValueIteration):
             # "axis" means the axis along which to operate. In this case it
             # finds the maximum of the the rows. (Operates along the columns?)
             # variation = _util.getSpan(self.V - Vprev)
-            variation = np.max(np.abs(self.V) - Vprev)
+            variation = np.max(np.abs(self.V - Vprev))
 
             if self.verbose:
                 print(("    %s\t\t  %s" % (self.iter, variation)))
