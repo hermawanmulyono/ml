@@ -175,6 +175,7 @@ class PolicyIteration(MDPPolicyIteration):
                          eval_type)
         self.evaluations = []
         self.epsilon = epsilon
+        self.max_iter = max_iter
 
     def run(self):
         # Run the policy iteration algorithm.
@@ -212,7 +213,8 @@ class PolicyIteration(MDPPolicyIteration):
             self.evaluations.append((self.iter, np.mean(self.V)))
             print((self.iter, np.mean(self.V)))
 
-            variation = _util.getSpan(self.V - Vprev)
+            # variation = _util.getSpan(self.V - Vprev)
+            variation = np.max(np.abs(self.V) - Vprev)
 
             # if n_different == 0:
             if variation < self.epsilon:
@@ -244,6 +246,7 @@ class ValueIteration(MDPValueIteration):
 
         super().__init__(transitions, reward, discount, epsilon, max_iter,
                          initial_value)
+        self.max_iter = max_iter
         self.evaluations = []
 
     def run(self):
@@ -264,7 +267,8 @@ class ValueIteration(MDPValueIteration):
             # The values, based on Q. For the function "max()": the option
             # "axis" means the axis along which to operate. In this case it
             # finds the maximum of the the rows. (Operates along the columns?)
-            variation = _util.getSpan(self.V - Vprev)
+            # variation = _util.getSpan(self.V - Vprev)
+            variation = np.max(np.abs(self.V) - Vprev)
 
             if self.verbose:
                 print(("    %s\t\t  %s" % (self.iter, variation)))

@@ -10,7 +10,8 @@ from mdptoolbox.mdp import MDP
 import matplotlib.pyplot as plt
 
 from utils.base import task_template, append_problem_name
-from utils.outputs import frozen_lake_map, frozen_lake_policy_path
+from utils.outputs import frozen_lake_map, frozen_lake_policy_path, \
+    convergence_plot
 from utils.algs import PolicyIteration, ValueIteration, QLearning
 
 
@@ -184,7 +185,10 @@ def task_policy_iteration():
                                                     single_policy_iteration,
                                                     eval_fn, group_problems_by)
 
-    import matplotlib.pyplot as plt
+    generate_convergence_plots(joblib_table, problem_name, alg_name)
+
+
+def generate_convergence_plots(joblib_table, problem_name: str, alg_name: str):
 
     for grid in get_param_grid():
         plt.figure()
@@ -219,6 +223,11 @@ def task_policy_iteration():
             plt.plot(steps, vmean, label=f'{epsilon}')
         plt.legend()
 
+        size = grid['size'][0]
+        problem_name_w_size = f'{problem_name}_{size}'
+        filename = convergence_plot(problem_name_w_size, alg_name, 'epsilon')
+        plt.savefig(filename)
+
         plt.figure()
         for discount in grid['discount'][::-1]:
             epsilon = 0.001
@@ -249,7 +258,9 @@ def task_policy_iteration():
             print(evaluations)
             plt.plot(steps, vmean, label=f'{discount}')
         plt.legend()
-        plt.show()
+
+        filename = convergence_plot(problem_name_w_size, alg_name, 'gamma')
+        plt.savefig(filename)
 
 
 def task_value_iteration():
@@ -275,8 +286,11 @@ def task_value_iteration():
     def eval_fn(mdp, size, p, is_slippery, **kwargs):
         return eval_mdp(mdp, size, p, is_slippery)
 
-    task_template(problem_name, alg_name, param_grid, single_value_iteration,
-                  eval_fn, group_problems_by)
+    joblib_table, _ = task_template(problem_name, alg_name, param_grid,
+                                    single_value_iteration, eval_fn,
+                                    group_problems_by)
+
+    generate_convergence_plots(joblib_table, problem_name, alg_name)
 
 
 def epsilon_schedule(n):

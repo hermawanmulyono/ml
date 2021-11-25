@@ -89,9 +89,9 @@ def task_template(problem_name: str,
             joblib_table.append((kwargs, pi))
 
             # For debugging frozen lake
-            from utils.frozenlake import plot_policy
-            plot_policy(pi.policy, kwargs['size'], kwargs['p'], 'eval.png')
-            plt.show()
+            # from utils.frozenlake import plot_policy
+            # plot_policy(pi.policy, kwargs['size'], kwargs['p'], 'eval.png')
+            # plt.show()
 
             # For debugging forest
             # plt.figure(figsize=(6, 2))

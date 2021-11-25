@@ -28,3 +28,7 @@ def frozen_lake_map(size: int, p: float):
 def frozen_lake_policy_path(problem_name_with_params: str):
     return f'{OUTPUT_DIRECTORY}/{problem_name_with_params}.png'
 
+
+def convergence_plot(problem: str, alg_name: str, param: str):
+    return f'{OUTPUT_DIRECTORY}/{problem}_{alg_name}_{param}.png'
+
