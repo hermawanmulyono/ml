@@ -25,10 +25,13 @@ def frozen_lake_map(size: int, p: float):
     return f'{OUTPUT_DIRECTORY}/map_{size}_p_{p}_cols.joblib'
 
 
+def frozen_lake_map_png(size: int, p: float):
+    return f'{OUTPUT_DIRECTORY}/map_{size}_p_{p}_cols.png'
+
+
 def frozen_lake_policy_path(problem_name_with_params: str):
     return f'{OUTPUT_DIRECTORY}/{problem_name_with_params}.png'
 
 
 def convergence_plot(problem: str, alg_name: str, param: str):
     return f'{OUTPUT_DIRECTORY}/{problem}_{alg_name}_{param}.png'
-

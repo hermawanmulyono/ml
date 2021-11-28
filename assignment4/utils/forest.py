@@ -2,6 +2,7 @@ import copy
 import math
 from typing import Dict
 
+import numpy as np
 from mdptoolbox.mdp import MDP
 import mdptoolbox.example
 from scipy.stats import entropy
@@ -13,12 +14,27 @@ from utils.outputs import convergence_plot
 
 
 def run_all():
-    all_scores_table1 = task_policy_iteration()
-    all_scores_table2 = task_value_iteration()
+    joblib_table1, all_scores_table1 = task_policy_iteration()
+    joblib_table2, all_scores_table2 = task_value_iteration()
 
+    compare_joblib_tables(joblib_table1, joblib_table2)
     compare_scores_tables(all_scores_table1, all_scores_table2)
 
-    task_q_learning()
+    joblib_table3, all_scores_table3 = task_q_learning()
+
+    print('Printing PI time')
+    print_wall_time(joblib_table1)
+    print('Printing VI time')
+    print_wall_time(joblib_table2)
+    print('Printing Q-Learning time')
+    print_wall_time(joblib_table3)
+
+
+def print_wall_time(joblib_table):
+    times = []
+    for kwargs, mdp in joblib_table:
+        times.append(mdp.time)
+    print(f'Average wall time {np.mean(times)}')
 
 
 def get_pi_vi_param_grid():
@@ -194,7 +210,7 @@ def task_policy_iteration():
                 print(results)
     '''
 
-    return all_scores_tables
+    return joblib_table, all_scores_tables
 
 
 def task_value_iteration():
@@ -222,7 +238,7 @@ def task_value_iteration():
 
     generate_convergence_plots(joblib_table, problem_name, alg_name)
 
-    return all_scores_table
+    return joblib_table, all_scores_table
 
 
 def generate_convergence_plots(joblib_table, problem_name: str, alg_name: str):
@@ -315,25 +331,28 @@ def task_q_learning():
     problem_name = 'forest'
     alg_name = 'q_learning'
 
-    param_grid = [{
-        'S': [10],
+    param_grid = [
+    {
+        'S': [10, 1000],
         'r1': [8],
         'r2': [8],
         'p': [0.1],
         'epsilon_schedule': [None, epsilon_schedule, 0.9],
-        'learning_rate_schedule': [None, learning_rate_schedule],
+        'learning_rate_schedule': [learning_rate_schedule],  # [None,learning_rate_schedule],
         'discount': [0.9, 0.99, 0.999],
-        'n_iter': [10000]
-    }, {
-        'S': [1000],
+        'n_iter': [500000]
+    },
+    {
+        'S': [10, 1000],
         'r1': [8],
         'r2': [8],
         'p': [0.1],
-        'epsilon_schedule': [None, epsilon_schedule, 0.9],
+        'epsilon_schedule': [epsilon_schedule],  # [None, epsilon_schedule, 0.9],
         'learning_rate_schedule': [None, learning_rate_schedule],
         'discount': [0.9, 0.99, 0.999],
-        'n_iter': [100000]
-    }]
+        'n_iter': [500000]
+    }
+    ]
 
     group_problems_by = ['S', 'r1', 'r2', 'p']
 
@@ -349,18 +368,27 @@ def task_q_learning():
         vi.run()
         return vi
 
-    joblib_table, _ = task_template(problem_name, alg_name, param_grid,
+    joblib_table, scores_table = task_template(problem_name, alg_name,
+                                              param_grid,
                                     single_qlearning, eval_mdp,
                                     group_problems_by)
 
-    for grid in param_grid:
-        S = grid['S'][0]
+    ########################################################
+    # Plot epsilon schedule
+    ########################################################
+
+    grid = param_grid[0]
+    for S in grid['S']:
         r1 = grid['r1'][0]
         r2 = grid['r2'][0]
         p = grid['p'][0]
         n_iter = grid['n_iter'][0]
 
+        plt.close("all")
         plt.figure()
+
+        assert len(grid['epsilon_schedule']) > 1
+
         for epsilon_schedule_ in grid['epsilon_schedule'][::-1]:
             discount = 0.99
             kwargs = {
@@ -369,7 +397,7 @@ def task_q_learning():
                 'r2': r2,
                 'p': p,
                 'epsilon_schedule': epsilon_schedule_,
-                'learning_rate_schedule': None,
+                'learning_rate_schedule': grid['learning_rate_schedule'][0],
                 'discount': discount,
                 'n_iter': n_iter
             }
@@ -388,7 +416,7 @@ def task_q_learning():
             steps, vmean = zip(*evaluations)
 
             if callable(epsilon_schedule_):
-                label = epsilon_schedule_.__name__
+                label = 'custom_eps_schedule'
             elif epsilon_schedule_ is None:
                 label = 'default'
             else:
@@ -405,8 +433,20 @@ def task_q_learning():
                                     'epsilon_schedule')
         plt.savefig(filename)
 
+    ########################################################
+    # Plot learning_rate_schedule
+    ########################################################
+
+    grid = param_grid[1]
+    for S in grid['S']:
         plt.close("all")
         plt.figure()
+
+        r1 = grid['r1'][0]
+        r2 = grid['r2'][0]
+        p = grid['p'][0]
+        n_iter = grid['n_iter'][0]
+
         for learning_rate_schedule_ in grid['learning_rate_schedule'][::-1]:
             discount = 0.99
             kwargs = {
@@ -414,7 +454,7 @@ def task_q_learning():
                 'r1': r1,
                 'r2': r2,
                 'p': p,
-                'epsilon_schedule': None,
+                'epsilon_schedule': grid['epsilon_schedule'][0],
                 'learning_rate_schedule': learning_rate_schedule_,
                 'discount': discount,
                 'n_iter': n_iter
@@ -434,7 +474,7 @@ def task_q_learning():
             steps, vmean = zip(*evaluations)
 
             if callable(learning_rate_schedule_):
-                label = learning_rate_schedule_.__name__
+                label = 'custom_lr_schedule'
             elif learning_rate_schedule_ is None:
                 label = 'default'
             else:
@@ -448,9 +488,10 @@ def task_q_learning():
 
         problem_name_w_size = f'{problem_name}_{S}'
         filename = convergence_plot(problem_name_w_size, alg_name,
-                                    'epsilon_schedule')
+                                    'learning_rate_schedule')
         plt.savefig(filename)
-        plt.show()
+
+    return joblib_table, scores_table
 
 
 def eval_mdp(mdp: MDP, **kwargs):
@@ -462,6 +503,43 @@ def eval_mdp(mdp: MDP, **kwargs):
     e = entropy(list(counts.values()))
 
     return e
+
+
+def compare_joblib_tables(joblib_table1, joblib_table2):
+    n_experiments = 0
+    n_policy_same = 0
+    n_iter1_smaller = 0
+    n_iter1_faster = 0
+    n_almost_equal = 0
+
+    table1 = copy.deepcopy(joblib_table1)
+    table2 = copy.deepcopy(joblib_table2)
+
+    table1.sort(key=lambda x: str(x[0]))
+    table2.sort(key=lambda x: str(x[0]))
+
+    for (key1, mdp1), (key2, mdp2) in zip(table1, table2):
+        assert key1 == key2
+
+        n_experiments += 1
+
+        if mdp1.policy == mdp2.policy:
+            n_policy_same += 1
+
+        if mdp1.iter <= mdp2.iter:
+            n_iter1_smaller += 1
+
+        if mdp1.time <= mdp2.time:
+            n_iter1_faster += 1
+
+        if np.allclose(mdp1.V, mdp2.V, rtol=0.1):
+            n_almost_equal += 1
+
+    print(f'n_experiments {n_experiments}')
+    print(f'n_policy_same {n_policy_same}')
+    print(f'n_iter1_smaller {n_iter1_smaller}')
+    print(f'n_iter1_faster {n_iter1_faster}')
+    print(f'n_almost_equal {n_almost_equal}')
 
 
 def compare_scores_tables(all_scores_table1: Dict[str, list],

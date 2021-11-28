@@ -123,7 +123,7 @@ class QLearning(MDPQLearning):
             self.V = self.Q.max(axis=1)
             self.policy = self.Q.argmax(axis=1)
 
-            eval_every = int(np.ceil(self.max_iter // 1000))
+            eval_every = int(np.ceil(self.max_iter // 10))
             if n % eval_every == 0:
                 eval_v = self.eval_policy()
                 mean_v = np.mean(eval_v)
